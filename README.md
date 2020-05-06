@@ -17,6 +17,7 @@ Bug fixes:
 
 - Apr. 30: Compilation error fix
 - May. 1: Copy should emit bitwidth, SExt should correctly emit mask, PHI is incorrectly emitted when used by each other
+- May. 3: Support global variables (SimpleBackend.cpp will lower them to `malloc` + `inttoptr <glb var address>`), switch should print dot at basic block names
 
 ## How to compile
 
