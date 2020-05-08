@@ -1,4 +1,4 @@
-# SWPP Compiler
+# SWPP Compiler (Team 4 Repository)
 
 This compiler converts LLVM IR to SWPP assembly.
 
