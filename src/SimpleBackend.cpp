@@ -119,6 +119,13 @@ private:
         assert(I->getName().startswith("__r"));
     Builder->CreateStore(V, RegToAllocaMap[I]);
   }
+  void emitStoreAndSave(Value *Res, Instruction *I) {
+    if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
+      emitStoreToSrcRegister(Res, I)
+    auto *NewI = dyn_cast<Instruction>(Res);
+    assert(NewI);
+    InstMap[&I] = NewI;
+  }
 
   // Encode the value of V.
   // If V is an argument, return the corresponding argN argument.
@@ -317,9 +324,7 @@ public:
     unsigned RegNum = assemblyRegisterNumber(&I);
     auto *NewAllc = Builder->CreateAlloca(I.getAllocatedType(),
                                           I.getArraySize(), assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(NewAllc, &I);
-    InstMap[&I] = NewAllc;
+    emitStoreAndSave(NewAllc, &I);
   }
   void visitLoadInst(LoadInst &LI) {
     checkSrcType(LI.getType());
@@ -340,11 +345,7 @@ public:
       LoadedVal = Builder->CreateLoad(TgtPtrOp, assemblyRegisterName(RegNum));
     }
     checkTgtType(LoadedVal->getType());
-    if (RegNum == 1)
-      emitStoreToSrcRegister(LoadedVal, &LI);
-    auto NewLI = dyn_cast<Instruction>(LoadedVal);
-    assert(NewLI);
-    InstMap[&LI] = NewLI;
+    emitStoreAndSave(LoadedVal, &LI);
   }
   void visitStoreInst(StoreInst &SI) {
     auto *Ty = SI.getValueOperand()->getType();
@@ -405,11 +406,7 @@ public:
       Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
                                  assemblyRegisterName(RegNum));
     }
-    if (RegNum == 1)
-      emitStoreToSrcRegister(Res, &BO);
-    auto NewBO = dyn_cast<Instruction>(Res);
-    assert(NewBO);
-    InstMap[&BO] = NewBO;
+    emitStoreAndSave(Res, &BO);
   }
   void visitICmpInst(ICmpInst &II) {
     auto *OpTy = II.getOperand(0)->getType();
@@ -427,14 +424,10 @@ public:
     unsigned RegNum = assemblyRegisterNumber(&II);
     string Reg = assemblyRegisterName(RegNum);
     string Reg_before_zext = Reg + "before_zext__";
-    auto Res = Builder->CreateZExt(
+    auto *Res = Builder->CreateZExt(
         Builder->CreateICmp(II.getPredicate(), Op1Trunc, Op2Trunc,
         Reg_before_zext), I64Ty, Reg);
-    if (RegNum == 1)
-      emitStoreToSrcRegister(Res, &II);
-    auto NewII = dyn_cast<Instruction>(Res);
-    assert(NewII);
-    InstMap[&II] = NewII;
+    emitStoreAndSave(Res, &II)
   }
   void visitSelectInst(SelectInst &SI) {
     auto *Ty = SI.getType();
@@ -448,13 +441,9 @@ public:
     auto *OpRight = translateSrcOperandToTgt(SI.getOperand(2), 3);
     
     unsigned RegNum = assemblyRegisterNumber(&SI);
-    auto Res = Builder->CreateSelect(OpCond,
+    auto *Res = Builder->CreateSelect(OpCond,
                     OpLeft, OpRight, assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(Res, &SI);
-    auto NewSI = dyn_cast<Instruction>(Res);
-    assert(NewSI);
-    InstMap[&SI] = NewSI;  
+    emitStoreAndSave(Res, &SI);
   }
   void visitGetElementPtrInst(GetElementPtrInst &GEPI) {
     // Make it look like 'gep i8* ptr, i'
@@ -495,11 +484,7 @@ public:
     unsigned RegNum = assemblyRegisterNumber(&GEPI);
     PtrOp = Builder->CreateBitCast(PtrI8Op, GEPI.getType(),
                                    assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(PtrOp, &GEPI);
-    auto NewGEPI = dyn_cast<Instruction>(PtrOp);
-    assert(NewGEPI);
-    InstMap[&GEPI] = NewGEPI;
+    emitStoreAndSave(PtrOp, &GEPI);
   }
 
   // ---- Casts ----
@@ -508,11 +493,7 @@ public:
     unsigned RegNum = assemblyRegisterNumber(&BCI);
     auto *CastedOp = Builder->CreateBitCast(Op, BCI.getType(),
         assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(CastedOp, &BCI);
-    auto NewBCI = dyn_cast<Instruction>(CastedOp);
-    assert(NewBCI);
-    InstMap[&BCI] = NewBCI;
+    emitStoreAndSave(CastedOp, &BCI);
   }
   void visitSExtInst(SExtInst &SI) {
     // Get the sign bit.
@@ -526,11 +507,7 @@ public:
     unsigned RegNum = assemblyRegisterNumber(&SI);
     auto *ResVal =
       Builder->CreateOr(NegVal, Op, assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(ResVal, &SI);
-    auto NewSI = dyn_cast<Instruction>(ResVal);
-    assert(NewSI);
-    InstMap[&SI] = NewSI;
+    emitStoreAndSave(ResVal, &SI);
   }
   void visitZExtInst(ZExtInst &ZI) {
     // Everything is zero-extended by default.
@@ -541,33 +518,21 @@ public:
     auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
     uint64_t Mask = (1llu << (TI.getDestTy()->getIntegerBitWidth())) - 1;
     unsigned RegNum = assemblyRegisterNumber(&TI);
-    auto Res = Builder->CreateAnd(Op, Mask, assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(Res, &TI);
-    auto NewTI = dyn_cast<Instruction>(Res);
-    assert(NewTI);
-    InstMap[&TI] = NewTI;
+    auto *Res = Builder->CreateAnd(Op, Mask, assemblyRegisterName(RegNum));
+    emitStoreAndSave(Res, &TI);
   }
   void visitPtrToIntInst(PtrToIntInst &PI) {
     auto *Op = translateSrcOperandToTgt(PI.getOperand(0), 1);
     unsigned RegNum = assemblyRegisterNumber(&PI);
-    auto Res = Builder->CreatePtrToInt(Op, I64Ty, 
+    auto *Res = Builder->CreatePtrToInt(Op, I64Ty, 
                                     assemblyRegisterName(RegNum));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(Res, &PI);
-    auto NewPI = dyn_cast<Instruction>(Res);
-    assert(NewPI);
-    InstMap[&PI] = NewPI;
+    emitStoreAndSave(Res, &PI);
   }
   void visitIntToPtrInst(IntToPtrInst &II) {
     auto *Op = translateSrcOperandToTgt(II.getOperand(0), 1);
     unsigned RegNum = assemblyRegisterNumber(&II);
-    auto Res = Builder->CreateIntToPtr(Op, II.getType(), assemblyRegisterName(1));
-    if (RegNum == 1)
-      emitStoreToSrcRegister(Res, &II);
-    auto NewII = dyn_cast<Instruction>(Res);
-    assert(NewII);
-    InstMap[&II] = NewII;
+    auto *Res = Builder->CreateIntToPtr(Op, II.getType(), assemblyRegisterName(1));
+    emitStoreAndSave(Res, &II);
   }
 
   // ---- Call ----
@@ -586,11 +551,7 @@ public:
       unsigned RegNum = assemblyRegisterNumber(&CI);
       Value *Res = Builder->CreateCall(CalledFInTgt, Args,
                                        assemblyRegisterName(RegNum));
-      if (RegNum == 1)
-        emitStoreToSrcRegister(Res, &CI);
-      auto NewCI = dyn_cast<Instruction>(Res);
-      assert(NewCI);
-      InstMap[&CI] = NewCI;
+      emitStoreAndSave(Res, &CI);
     } else {
       Builder->CreateCall(CalledFInTgt, Args);
     }
