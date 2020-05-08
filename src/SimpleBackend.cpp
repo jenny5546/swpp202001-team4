@@ -101,7 +101,6 @@ private:
     assert(1 <= registerId && registerId <= 16);
     return "__r" + to_string(registerId) + "__";
   }
-
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId) {
     assert(RegToAllocaMap.count(I));
     assert(1 <= targetRegisterId && targetRegisterId <= 3 &&
@@ -121,10 +120,10 @@ private:
   }
   void emitStoreAndSave(Value *Res, Instruction *I) {
     if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
-      emitStoreToSrcRegister(Res, I)
+      emitStoreToSrcRegister(Res, I);
     auto *NewI = dyn_cast<Instruction>(Res);
     assert(NewI);
-    InstMap[&I] = NewI;
+    InstMap[I] = NewI;
   }
 
   // Encode the value of V.
@@ -165,7 +164,7 @@ private:
     }
   }
 
-public: 
+public:
   Module *getDepromotedModule() const
   { return ModuleToEmit.get(); }
 
@@ -427,7 +426,7 @@ public:
     auto *Res = Builder->CreateZExt(
         Builder->CreateICmp(II.getPredicate(), Op1Trunc, Op2Trunc,
         Reg_before_zext), I64Ty, Reg);
-    emitStoreAndSave(Res, &II)
+    emitStoreAndSave(Res, &II);
   }
   void visitSelectInst(SelectInst &SI) {
     auto *Ty = SI.getType();
