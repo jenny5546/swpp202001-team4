@@ -54,7 +54,6 @@ private:
   map<Instruction *, Instruction *> InstMap;
   map<Instruction *, unsigned> RegToRegMap;
   map<Instruction *, AllocaInst *> RegToAllocaMap;
-  map<PHINode *, AllocaInst *> PhiToTempAllocaMap;
 
   void raiseError(Instruction &I) {
     errs() << "DepromoteRegisters: Unsupported Instruction: " << I << "\n";
@@ -153,7 +152,6 @@ private:
       return GVMap[GV];
 
     } else if (auto *I = dyn_cast<Instruction>(V)) {
-      assert(InstMap.count(I));
       if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
         return emitLoadFromSrcRegister(I, OperandId);
       else
@@ -251,23 +249,12 @@ public:
     if (&BB == &SourceFunc->getEntryBlock()) {
       // Let's create an alloca for each register..!
       IRBuilder<> IB(BBToEmit);
-      if (FuncToEmit->getName() == "main") {
-        // Let's create a malloc for each global var.
-        // This is dummy register.
-        string Reg1 = assemblyRegisterName(1);
-        for (auto &[_, Size] : GVLocs) {
-          auto *ArgTy =
-            dyn_cast<IntegerType>(MallocFn->getFunctionType()->getParamType(0));
-          assert(ArgTy);
-          IB.CreateCall(MallocFn, {ConstantInt::get(ArgTy, Size)}, Reg1);
-        }
-      }
 
       // sort by number of usages
       vector<pair<unsigned, Instruction *>> InstCount;
       for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
            I != E; ++I) {
-        if (!I->hasName() || dyn_cast<ZExtInst>(&*I))
+        if (!I->hasName() || dyn_cast<ZExtInst>(&*I) || dyn_cast<PHINode>(&*I))
           continue;
         auto SingleInstCount = make_pair(0, &*I);
         for (auto itr = (*I).use_begin(), end = (*I).use_end(); itr != end; ++itr) {
@@ -281,7 +268,7 @@ public:
       sort(InstCount.begin(), InstCount.end()); 
       reverse(InstCount.begin(), InstCount.end()); // descending order
 
-      // choose 15 instructions to keep in register
+      // choose 13 instructions to keep in register
       for (unsigned i = 0, sz = InstCount.size(); i < 13 && i < sz; i++)
         RegToRegMap[InstCount[i].second] = i + 4; // r4 ~ r16
 
@@ -291,18 +278,24 @@ public:
         if (I->hasName()) {
           auto *Ty = I->getType();
           checkSrcType(Ty);
-          if (auto *PN = dyn_cast<PHINode>(&*I)) {
-            RegToAllocaMap[&*I] =
-              IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
-            PhiToTempAllocaMap[PN] =
-              IB.CreateAlloca(SrcToTgtType(Ty), nullptr,
-                              I->getName() + "_phi_tmp_slot");
-          } else if (!RegToRegMap.count(&*I))
+          if (!RegToRegMap.count(&*I))
             RegToAllocaMap[&*I] =
               IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
         }
       }
+      if (FuncToEmit->getName() == "main") {
+        // Let's create a malloc for each global var.
+        // This is dummy register.
+        string Reg1 = assemblyRegisterName(1);
+        for (auto &[_, Size] : GVLocs) {
+          auto *ArgTy =
+            dyn_cast<IntegerType>(MallocFn->getFunctionType()->getParamType(0));
+          assert(ArgTy);
+          IB.CreateCall(MallocFn, {ConstantInt::get(ArgTy, Size)}, Reg1);
+        }
+      }
     }
+
     Builder = make_unique<IRBuilder<TargetFolder>>(BBToEmit,
         TargetFolder(ModuleToEmit->getDataLayout()));
   }
@@ -623,15 +616,8 @@ public:
       checkTgtType(V->getType());
       assert(!isa<Instruction>(V) || !V->hasName() ||
              V->getName().startswith("__r"));
-      assert(PhiToTempAllocaMap.count(&PHI));
-      Builder->CreateStore(V, PhiToTempAllocaMap[&PHI]);
-    }
-    for (auto &PHI : Succ->phis()) {
       assert(RegToAllocaMap.count(&PHI));
-      auto Res = Builder->CreateLoad(PhiToTempAllocaMap[&PHI], 
-                                                assemblyRegisterName(1));
-      Builder->CreateStore(Res, RegToAllocaMap[&PHI]);
-      InstMap[&PHI] = Res;
+      Builder->CreateStore(V, RegToAllocaMap[&PHI]);
     }
   }
 
