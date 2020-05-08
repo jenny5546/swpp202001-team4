@@ -7,9 +7,13 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_os_ostream.h"
+#include <algorithm>
+#include <iterator>
+#include <map>
+#include <memory>
 #include <string>
 #include <sstream>
-#include <memory>
+#include <vector>
 
 using namespace llvm;
 using namespace std;
@@ -47,6 +51,8 @@ private:
   vector<pair<uint64_t, uint64_t>> GVLocs; // (Global var addr, size) info
   map<Argument *, Argument *> ArgMap;
   map<BasicBlock *, BasicBlock *> BBMap;
+  map<Instruction *, Instruction *> InstMap;
+  map<Instruction *, unsigned> RegToRegMap;
   map<Instruction *, AllocaInst *> RegToAllocaMap;
   map<PHINode *, AllocaInst *> PhiToTempAllocaMap;
 
@@ -85,15 +91,21 @@ private:
     }
   }
 
-
+  unsigned assemblyRegisterNumber(Instruction *I) {
+    if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
+      return 1;
+    else
+      return RegToRegMap[I];
+  }
   string assemblyRegisterName(unsigned registerId) {
     assert(1 <= registerId && registerId <= 16);
     return "__r" + to_string(registerId) + "__";
   }
+
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId) {
     assert(RegToAllocaMap.count(I));
-    assert(1 <= targetRegisterId && targetRegisterId <= 16 &&
-           "r1 ~ r16 are available only!");
+    assert(1 <= targetRegisterId && targetRegisterId <= 3 &&
+           "r1 ~ r3 are only available for temporary storage!");
     string RegName = assemblyRegisterName(targetRegisterId);
     auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], RegName);
     checkTgtType(TgtVal->getType());
@@ -135,14 +147,18 @@ private:
       return GVMap[GV];
 
     } else if (auto *I = dyn_cast<Instruction>(V)) {
-      return emitLoadFromSrcRegister(I, OperandId);
+      assert(InstMap.count(I));
+      if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
+        return emitLoadFromSrcRegister(I, OperandId);
+      else
+        return InstMap[I];
 
     } else {
       assert(false && "Unknown instruction type!");
     }
   }
 
-public:
+public: 
   Module *getDepromotedModule() const
   { return ModuleToEmit.get(); }
 
@@ -229,20 +245,6 @@ public:
     if (&BB == &SourceFunc->getEntryBlock()) {
       // Let's create an alloca for each register..!
       IRBuilder<> IB(BBToEmit);
-      for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
-           I != E; ++I) {
-        if (I->hasName()) {
-          auto *Ty = I->getType();
-          checkSrcType(Ty);
-          RegToAllocaMap[&*I] =
-            IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
-          if (auto *PN = dyn_cast<PHINode>(&*I)) {
-            PhiToTempAllocaMap[PN] =
-              IB.CreateAlloca(SrcToTgtType(Ty), nullptr,
-                              I->getName() + "_phi_tmp_slot");
-          }
-        }
-      }
       if (FuncToEmit->getName() == "main") {
         // Let's create a malloc for each global var.
         // This is dummy register.
@@ -254,8 +256,47 @@ public:
           IB.CreateCall(MallocFn, {ConstantInt::get(ArgTy, Size)}, Reg1);
         }
       }
-    }
 
+      // sort by number of usages
+      vector<pair<unsigned, Instruction *>> InstCount;
+      for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
+           I != E; ++I) {
+        if (!I->hasName() || dyn_cast<ZExtInst>(&*I))
+          continue;
+        auto SingleInstCount = make_pair(0, &*I);
+        for (auto itr = (*I).use_begin(), end = (*I).use_end(); itr != end; ++itr) {
+            User *Usr = (*itr).getUser();
+            if (!dyn_cast<Instruction>(Usr)) // Not an instruction instance
+              continue;
+            SingleInstCount.first++;
+        }
+        InstCount.push_back(SingleInstCount);
+      }
+      sort(InstCount.begin(), InstCount.end()); 
+      reverse(InstCount.begin(), InstCount.end()); // descending order
+
+      // choose 15 instructions to keep in register
+      for (unsigned i = 0, sz = InstCount.size(); i < 13 && i < sz; i++)
+        RegToRegMap[InstCount[i].second] = i + 4; // r4 ~ r16
+
+      // either create alloca, or use register
+      for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
+           I != E; ++I) {
+        if (I->hasName()) {
+          auto *Ty = I->getType();
+          checkSrcType(Ty);
+          if (auto *PN = dyn_cast<PHINode>(&*I)) {
+            RegToAllocaMap[&*I] =
+              IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
+            PhiToTempAllocaMap[PN] =
+              IB.CreateAlloca(SrcToTgtType(Ty), nullptr,
+                              I->getName() + "_phi_tmp_slot");
+          } else if (!RegToRegMap.count(&*I))
+            RegToAllocaMap[&*I] =
+              IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
+        }
+      }
+    }
     Builder = make_unique<IRBuilder<TargetFolder>>(BBToEmit,
         TargetFolder(ModuleToEmit->getDataLayout()));
   }
@@ -273,9 +314,12 @@ public:
 
     checkSrcType(I.getAllocatedType());
     // This will be lowered to 'r1 = add sp, <offset>'
+    unsigned RegNum = assemblyRegisterNumber(&I);
     auto *NewAllc = Builder->CreateAlloca(I.getAllocatedType(),
-                                          I.getArraySize(), assemblyRegisterName(1));
-    emitStoreToSrcRegister(NewAllc, &I);
+                                          I.getArraySize(), assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(NewAllc, &I);
+    InstMap[&I] = NewAllc;
   }
   void visitLoadInst(LoadInst &LI) {
     checkSrcType(LI.getType());
@@ -283,19 +327,24 @@ public:
     auto *LoadedTy = TgtPtrOp->getType()->getPointerElementType();
     Value *LoadedVal = nullptr;
 
+    unsigned RegNum = assemblyRegisterNumber(&LI);
     if (LoadedTy->isIntegerTy() && LoadedTy->getIntegerBitWidth() < 64) {
       // Need to zext.
       // before_zext__ will be recognized by the assembler & merged with 64-bit
       // load to a smaller load.
-      string Reg = assemblyRegisterName(1);
+      string Reg = assemblyRegisterName(RegNum);
       string RegBeforeZext = Reg + "before_zext__";
       LoadedVal = Builder->CreateLoad(TgtPtrOp, RegBeforeZext);
       LoadedVal = Builder->CreateZExt(LoadedVal, I64Ty, Reg);
     } else {
-      LoadedVal = Builder->CreateLoad(TgtPtrOp, assemblyRegisterName(1));
+      LoadedVal = Builder->CreateLoad(TgtPtrOp, assemblyRegisterName(RegNum));
     }
     checkTgtType(LoadedVal->getType());
-    emitStoreToSrcRegister(LoadedVal, &LI);
+    if (RegNum == 1)
+      emitStoreToSrcRegister(LoadedVal, &LI);
+    auto NewLI = dyn_cast<Instruction>(LoadedVal);
+    assert(NewLI);
+    InstMap[&LI] = NewLI;
   }
   void visitStoreInst(StoreInst &SI) {
     auto *Ty = SI.getValueOperand()->getType();
@@ -347,15 +396,20 @@ public:
         assemblyRegisterName(2) + "after_trunc__");
 
     Value *Res = nullptr;
+    unsigned RegNum = assemblyRegisterNumber(&BO);
     if (BO.getType() != I64Ty) {
       Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
-                                 assemblyRegisterName(1) + "before_zext__");
-      Res = Builder->CreateZExt(Res, I64Ty, assemblyRegisterName(1));
+                                 assemblyRegisterName(RegNum) + "before_zext__");
+      Res = Builder->CreateZExt(Res, I64Ty, assemblyRegisterName(RegNum));
     } else {
       Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
-                                 assemblyRegisterName(1));
+                                 assemblyRegisterName(RegNum));
     }
-    emitStoreToSrcRegister(Res, &BO);
+    if (RegNum == 1)
+      emitStoreToSrcRegister(Res, &BO);
+    auto NewBO = dyn_cast<Instruction>(Res);
+    assert(NewBO);
+    InstMap[&BO] = NewBO;
   }
   void visitICmpInst(ICmpInst &II) {
     auto *OpTy = II.getOperand(0)->getType();
@@ -370,13 +424,17 @@ public:
         assemblyRegisterName(2) + "after_trunc__");
 
     // i1 -> i64 zext
-    string Reg = assemblyRegisterName(1);
+    unsigned RegNum = assemblyRegisterNumber(&II);
+    string Reg = assemblyRegisterName(RegNum);
     string Reg_before_zext = Reg + "before_zext__";
-    emitStoreToSrcRegister(
-      Builder->CreateZExt(
+    auto Res = Builder->CreateZExt(
         Builder->CreateICmp(II.getPredicate(), Op1Trunc, Op2Trunc,
-        Reg_before_zext), I64Ty, Reg),
-      &II);
+        Reg_before_zext), I64Ty, Reg);
+    if (RegNum == 1)
+      emitStoreToSrcRegister(Res, &II);
+    auto NewII = dyn_cast<Instruction>(Res);
+    assert(NewII);
+    InstMap[&II] = NewII;
   }
   void visitSelectInst(SelectInst &SI) {
     auto *Ty = SI.getType();
@@ -388,9 +446,15 @@ public:
 
     auto *OpLeft = translateSrcOperandToTgt(SI.getOperand(1), 2);
     auto *OpRight = translateSrcOperandToTgt(SI.getOperand(2), 3);
-    emitStoreToSrcRegister(
-      Builder->CreateSelect(OpCond, OpLeft, OpRight, assemblyRegisterName(1)),
-      &SI);
+    
+    unsigned RegNum = assemblyRegisterNumber(&SI);
+    auto Res = Builder->CreateSelect(OpCond,
+                    OpLeft, OpRight, assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(Res, &SI);
+    auto NewSI = dyn_cast<Instruction>(Res);
+    assert(NewSI);
+    InstMap[&SI] = NewSI;  
   }
   void visitGetElementPtrInst(GetElementPtrInst &GEPI) {
     // Make it look like 'gep i8* ptr, i'
@@ -428,17 +492,27 @@ public:
       ++Idx;
     }
 
+    unsigned RegNum = assemblyRegisterNumber(&GEPI);
     PtrOp = Builder->CreateBitCast(PtrI8Op, GEPI.getType(),
-                                   assemblyRegisterName(1));
-    emitStoreToSrcRegister(PtrOp, &GEPI);
+                                   assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(PtrOp, &GEPI);
+    auto NewGEPI = dyn_cast<Instruction>(PtrOp);
+    assert(NewGEPI);
+    InstMap[&GEPI] = NewGEPI;
   }
 
   // ---- Casts ----
   void visitBitCastInst(BitCastInst &BCI) {
     auto *Op = translateSrcOperandToTgt(BCI.getOperand(0), 1);
+    unsigned RegNum = assemblyRegisterNumber(&BCI);
     auto *CastedOp = Builder->CreateBitCast(Op, BCI.getType(),
-        assemblyRegisterName(1));
-    emitStoreToSrcRegister(CastedOp, &BCI);
+        assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(CastedOp, &BCI);
+    auto NewBCI = dyn_cast<Instruction>(CastedOp);
+    assert(NewBCI);
+    InstMap[&BCI] = NewBCI;
   }
   void visitSExtInst(SExtInst &SI) {
     // Get the sign bit.
@@ -449,33 +523,51 @@ public:
     auto *NegVal =
       Builder->CreateSub(ConstantInt::get(I64Ty, 0), AndVal,
                          assemblyRegisterName(2));
+    unsigned RegNum = assemblyRegisterNumber(&SI);
     auto *ResVal =
-      Builder->CreateOr(NegVal, Op, assemblyRegisterName(1));
-    emitStoreToSrcRegister(ResVal, &SI);
+      Builder->CreateOr(NegVal, Op, assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(ResVal, &SI);
+    auto NewSI = dyn_cast<Instruction>(ResVal);
+    assert(NewSI);
+    InstMap[&SI] = NewSI;
   }
   void visitZExtInst(ZExtInst &ZI) {
     // Everything is zero-extended by default.
-    auto *Op = translateSrcOperandToTgt(ZI.getOperand(0), 1);
-    emitStoreToSrcRegister(Op, &ZI);
+    // auto *Op = translateSrcOperandToTgt(ZI.getOperand(0), 1);
+    // emitStoreToSrcRegister(Op, &ZI);
   }
   void visitTruncInst(TruncInst &TI) {
     auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
     uint64_t Mask = (1llu << (TI.getDestTy()->getIntegerBitWidth())) - 1;
-    emitStoreToSrcRegister(
-      Builder->CreateAnd(Op, Mask, assemblyRegisterName(1)),
-      &TI);
+    unsigned RegNum = assemblyRegisterNumber(&TI);
+    auto Res = Builder->CreateAnd(Op, Mask, assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(Res, &TI);
+    auto NewTI = dyn_cast<Instruction>(Res);
+    assert(NewTI);
+    InstMap[&TI] = NewTI;
   }
   void visitPtrToIntInst(PtrToIntInst &PI) {
     auto *Op = translateSrcOperandToTgt(PI.getOperand(0), 1);
-    emitStoreToSrcRegister(
-      Builder->CreatePtrToInt(Op, I64Ty, assemblyRegisterName(1)),
-      &PI);
+    unsigned RegNum = assemblyRegisterNumber(&PI);
+    auto Res = Builder->CreatePtrToInt(Op, I64Ty, 
+                                    assemblyRegisterName(RegNum));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(Res, &PI);
+    auto NewPI = dyn_cast<Instruction>(Res);
+    assert(NewPI);
+    InstMap[&PI] = NewPI;
   }
   void visitIntToPtrInst(IntToPtrInst &II) {
     auto *Op = translateSrcOperandToTgt(II.getOperand(0), 1);
-    emitStoreToSrcRegister(
-      Builder->CreateIntToPtr(Op, II.getType(), assemblyRegisterName(1)),
-      &II);
+    unsigned RegNum = assemblyRegisterNumber(&II);
+    auto Res = Builder->CreateIntToPtr(Op, II.getType(), assemblyRegisterName(1));
+    if (RegNum == 1)
+      emitStoreToSrcRegister(Res, &II);
+    auto NewII = dyn_cast<Instruction>(Res);
+    assert(NewII);
+    InstMap[&II] = NewII;
   }
 
   // ---- Call ----
@@ -491,9 +583,14 @@ public:
       ++Idx;
     }
     if (CI.hasName()) {
+      unsigned RegNum = assemblyRegisterNumber(&CI);
       Value *Res = Builder->CreateCall(CalledFInTgt, Args,
-                                       assemblyRegisterName(1));
-      emitStoreToSrcRegister(Res, &CI);
+                                       assemblyRegisterName(RegNum));
+      if (RegNum == 1)
+        emitStoreToSrcRegister(Res, &CI);
+      auto NewCI = dyn_cast<Instruction>(Res);
+      assert(NewCI);
+      InstMap[&CI] = NewCI;
     } else {
       Builder->CreateCall(CalledFInTgt, Args);
     }
@@ -571,9 +668,10 @@ public:
     }
     for (auto &PHI : Succ->phis()) {
       assert(RegToAllocaMap.count(&PHI));
-      Builder->CreateStore(
-        Builder->CreateLoad(PhiToTempAllocaMap[&PHI], assemblyRegisterName(1)),
-        RegToAllocaMap[&PHI]);
+      auto Res = Builder->CreateLoad(PhiToTempAllocaMap[&PHI], 
+                                                assemblyRegisterName(1));
+      Builder->CreateStore(Res, RegToAllocaMap[&PHI]);
+      InstMap[&PHI] = Res;
     }
   }
 
