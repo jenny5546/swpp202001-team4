@@ -211,6 +211,9 @@ private:
     } else if (isa<ConstantPointerNull>(V)) {
       return { "0", -1 };
 
+    } else if (isa<UndefValue>(V)) {
+      return { "r1", -1 };
+
     } else if (auto *CE = dyn_cast<ConstantExpr>(V)) {
       if (CE->getOpcode() == Instruction::IntToPtr) {
         auto *CI = dyn_cast<ConstantInt>(CE->getOperand(0));
@@ -429,17 +432,22 @@ public:
     if (BI.isUnconditional()) {
       emitAssembly("br", {(string)BI.getSuccessor(0)->getName()});
     } else {
-      string msg = "Branch condition should be icmp ne";
-      auto *BCond = BI.getCondition();
-      raiseErrorIf(!isa<ICmpInst>(BCond), msg, BCond);
+      string Cond;
+      if (auto *C = dyn_cast<Constant>(BI.getCondition())) {
+        Cond = getOperand(C).first;
+      } else {
+        string msg = "Branch condition should be icmp ne";
+        auto *BCond = BI.getCondition();
+        raiseErrorIf(!isa<ICmpInst>(BCond), msg, BCond);
 
-      auto *II = dyn_cast<ICmpInst>(BCond);
-      raiseErrorIf(II->getPredicate() != ICmpInst::ICMP_NE, msg, BCond);
+        auto *II = dyn_cast<ICmpInst>(BCond);
+        raiseErrorIf(II->getPredicate() != ICmpInst::ICMP_NE, msg, BCond);
 
-      auto *ShouldBeZero = dyn_cast<ConstantInt>(II->getOperand(1));
-      raiseErrorIf(!ShouldBeZero || ShouldBeZero->getZExtValue() != 0, msg, BCond);
+        auto *ShouldBeZero = dyn_cast<ConstantInt>(II->getOperand(1));
+        raiseErrorIf(!ShouldBeZero || ShouldBeZero->getZExtValue() != 0, msg, BCond);
 
-      auto [Cond, _] = getOperand(II->getOperand(0));
+        Cond = getOperand(II->getOperand(0)).first;
+      }
       emitAssembly("br", { Cond, (string)BI.getSuccessor(0)->getName(),
                                  (string)BI.getSuccessor(1)->getName()});
     }

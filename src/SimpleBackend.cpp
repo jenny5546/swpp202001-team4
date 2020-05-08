@@ -127,6 +127,9 @@ private:
     } else if (isa<ConstantPointerNull>(V)) {
       return V;
 
+    } else if (isa<UndefValue>(V)) {
+      return UndefValue::get(I64Ty);
+
     } else if (auto *GV = dyn_cast<GlobalVariable>(V)) {
       assert(GVMap.count(GV));
       return GVMap[GV];
