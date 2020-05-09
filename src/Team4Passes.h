@@ -19,4 +19,9 @@ public:
 };
 */
 
+class ArithmeticPass : public llvm::PassInfoMixin<ArithmeticPass> {
+public:
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
+};
+
 #endif

@@ -85,7 +85,8 @@ int main(int argc, char **argv) {
 
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
-  FPM.addPass(DoNothingPass());
+  //FPM.addPass(DoNothingPass());
+  FPM.addPass(ArithmeticPass());
 
   ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
