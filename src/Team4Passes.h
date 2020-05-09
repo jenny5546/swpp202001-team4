@@ -54,34 +54,30 @@ public:
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
 
-    vector<Instruction *> unOutlinedInsts;
-    vector<Instruction *> outlinedInsts;
-    vector<Value *> dependentRegs;
-    bool outLined = false;
-
     /* Case 1. If a single block uses more than 16 registers, just break 
     into another function. No need to check for post dominance relations */
 
     for (auto &F : M){
-        
         for (auto &BB : F ){
-
+            // outs()<<"start of block\n";
+            vector<Instruction *> unOutlinedInsts;
+            vector<Instruction *> outlinedInsts;
+            vector<Value *> dependentRegs;
+            bool outLined = false;
             int regs = 0;
-            outLined = false;
-            // BasicBlock *block = &BB;
 
             /*  1. Iterate through Basic Block, push instructions to outline, 
             only if the basic block uses more than 14 resistors. */
 
             for (auto &I : BB){
-
                 /* Registers have names %x = (some instruction).
                 Keep track of the number of regs.*/
-
                 if (I.hasName()){
-                    // outs()<<I.getName()<<"\n";
+                    regs ++;   
+                }
+                if (!I.hasName() && !I.getType()->isVoidTy()){
+                    I.setName("temp");
                     regs ++;
-                    
                 }
                 if (regs<=13){ // If number of registers exceed 13 in one block, split.
                     unOutlinedInsts.push_back(&I); 
@@ -92,27 +88,66 @@ public:
                 } 
             }
 
-            /*  2. If outline_signal is true, outline the instructions in to a function call */
+            /*  2. If outline_signal is true, push dependent registers to use as function args */
 
             if (outLined){
+
+                // 1. Outline function uses regs from the previous insts. (Dependent!)
                 for(auto ai = F.arg_begin(), ae = F.arg_end(); ai != ae; ++ai){
                     if (hasUser(dyn_cast<Value>(ai),outlinedInsts)){
-  
                         dependentRegs.push_back(ai);
                     }
                 }
+                // 2. Outline function uses the func parameters. (Dependent!)
                 for (auto i : unOutlinedInsts){
                     if (hasUser(i,outlinedInsts)){
                         // outs()<<"instr with user"<<i->getName()<<"\n";
                         dependentRegs.push_back(i);
                     }
                 }
+                
+                /*  3. Create the new outlined function  */
+                vector<Type*> ArgTypes;
+
+                // Get argument types from the 'dependentRegs'
+                for (auto &r : dependentRegs){
+                    ArgTypes.push_back(r->getType());
+                }
+                FunctionType *FTy = FunctionType::get(F.getFunctionType()->getReturnType(),
+                                        ArgTypes, F.getFunctionType()->isVarArg());
+
+                string FunctionName = "OUTLINED_FUNCTION";
+                Function *OutlinedF = Function::Create(FTy, F.getLinkage(), F.getAddressSpace(),
+                                        FunctionName, F.getParent());
+                
+                Function::arg_iterator args = OutlinedF->arg_begin();
+                for (auto &r : dependentRegs){
+                    args->setName(r->getName());
+                    &*args++;
+                }
+
+                //* Print for debugging purposes *// 
+
+                // for (auto &I : outlinedInsts){
+                //     outs()<<"outlined instructions"<< I->getName()<<"\n";
+                // }
+
+                // for (auto &r : dependentRegs){
+                //     outs()<<"depndent registers"<< r->getName()<<"\n";
+                // }
+
+                // for(auto ai = OutlinedF->arg_begin(), ae = OutlinedF->arg_end(); ai != ae; ++ai){
+                //     outs()<<"copy arguments:"<< ai->getName()<<"\n";
+                // }
             }
 
+            
+            
+            // M.getFunctionList().push_back(OutlinedF);
 
             // outs()<<"size of vec: "<<dependentRegs.size()<<"\n";
-            // for (auto &r : dependentRegs){
-            //     outs()<<"dependent regs"<<r->getName()<<"\n";
+            // for (auto &i : outlinedInsts){
+            //     outs()<<"Outlined Instructions: "<<i->getName()<<"\n";
             // }
 
         } 
