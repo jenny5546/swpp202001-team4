@@ -521,14 +521,12 @@ public:
     auto *NegVal =
       Builder->CreateSub(ConstantInt::get(I64Ty, 0), AndVal,
                          retrieveAssemblyRegister(nullptr));
-    auto *ResVal = Builder->CreateOr(NegVal, Op, 
-                          retrieveAssemblyRegister(&SI));
+    auto *ResVal =
+      Builder->CreateOr(NegVal, Op, retrieveAssemblyRegister(&SI));
     saveInst(ResVal, &SI);
   }
   void visitZExtInst(ZExtInst &ZI) {
     // Everything is zero-extended by default.
-    // auto *Op = translateSrcOperandToTgt(ZI.getOperand(0), 1);
-    // emitStoreToSrcRegister(Op, &ZI);
   }
   void visitTruncInst(TruncInst &TI) {
     auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
