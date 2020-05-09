@@ -15,7 +15,7 @@
 #include <sstream>
 #include <vector>
 
-#define TEMPORARY_REGS 8
+#define TEMP_REGS 8
 
 using namespace llvm;
 using namespace std;
@@ -96,7 +96,7 @@ private:
   string retrieveAssemblyRegister(Instruction *I) {
     unsigned registerId;
     if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
-      for (int i = 0; i < TEMPORARY_REGS; i++) {
+      for (unsigned i = 0; i < TEMP_REGS; i++) {
         if (TempRegUsers[i].first == nullptr) {
           TempRegUsers[i].first = I;
           TempRegUsers[i].second.first = nullptr;
@@ -104,21 +104,19 @@ private:
         }
       }
       emitStoreToSrcRegister(TempRegUsers[0].second.first, TempRegUsers[0].first);
-      unsigned registerId = TempRegUsers[0].second.second;
+      registerId = TempRegUsers[0].second.second;
       TempRegUsers.erase(TempRegUsers.begin());
       TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
-      return "__r" + to_string(registerId) + "__";
-    } else {
+    } else
       registerId = RegToRegMap[I];
-      assert(1 <= registerId && registerId <= 16);
-      return "__r" + to_string(registerId) + "__";
-    }
+    assert(1 <= registerId && registerId <= 16);
+    return "__r" + to_string(registerId) + "__";
   }
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId) {
     assert(RegToAllocaMap.count(I));
-    assert(1 <= targetRegisterId && targetRegisterId <= TEMPORARY_REGS &&
+    assert(1 <= targetRegisterId && targetRegisterId <= TEMP_REGS &&
            "register ID out of bounds for temporary storage!");
-    for (int i = 0; i < TEMPORARY_REGS; i++) {
+    for (unsigned i = 0; i < TEMP_REGS; i++) {
       if (TempRegUsers[i].first == I) {
         assert(TempRegUsers[i].second.first != nullptr);
         return TempRegUsers[i].second.first;
@@ -127,12 +125,7 @@ private:
     string RegName = retrieveAssemblyRegister(I);
     auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], RegName);
     checkTgtType(TgtVal->getType());
-    for (int i = 0; i < TEMPORARY_REGS; i++) {
-      if (TempRegUsers[i].first == I) {
-        TempRegUsers[i].second.first = TgtVal;
-        break;
-      }
-    }
+    saveTempInst(I, TgtVal);
     return TgtVal;
   }
   void emitStoreToSrcRegister(Value *V, Instruction *I) {
@@ -147,8 +140,11 @@ private:
     auto *NewI = dyn_cast<Instruction>(Res);
     assert(NewI);
     InstMap[I] = NewI;
-    for (int i = 0; i < TEMPORARY_REGS; i++) {
-      if (TempRegUsers[i].first == I) {
+    saveTempInst(I, NewI);
+  }
+  void saveTempInst(Instruction *OldI, Instruction *NewI) {
+    for (unsigned i = 0; i < TEMP_REGS; i++) {
+      if (TempRegUsers[i].first == OldI) {
         TempRegUsers[i].second.first = NewI;
         return;
       }
@@ -278,22 +274,19 @@ public:
     Function *SourceFunc = BB.getParent();
     if (&BB == &SourceFunc->getEntryBlock()) {
       TempRegUsers.clear();
-      for (unsigned i = 0; i < TEMPORARY_REGS; i++) 
+      for (unsigned i = 0; i < TEMP_REGS; i++) 
         TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
       IRBuilder<> IB(BBToEmit);
 
       // sort by number of usages
       vector<pair<unsigned, Instruction *>> InstCount;
-      for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
-           I != E; ++I) {
+      for (auto I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc); I != E; ++I) {
         if (!I->hasName() || dyn_cast<ZExtInst>(&*I) || dyn_cast<PHINode>(&*I))
           continue;
         auto SingleInstCount = make_pair(0, &*I);
         for (auto itr = (*I).use_begin(), end = (*I).use_end(); itr != end; ++itr) {
-            User *Usr = (*itr).getUser();
-            if (!dyn_cast<Instruction>(Usr)) // Not an instruction instance
-              continue;
-            SingleInstCount.first++;
+            if (dyn_cast<Instruction>((*itr).getUser())) // Not an instruction instance
+              SingleInstCount.first++;
         }
         InstCount.push_back(SingleInstCount);
       }
@@ -301,9 +294,8 @@ public:
       reverse(InstCount.begin(), InstCount.end()); // descending order
 
       // choose 13 instructions to keep in register
-      for (unsigned i = 0, sz = InstCount.size(); 
-                                        i < 16 - TEMPORARY_REGS && i < sz; i++)
-        RegToRegMap[InstCount[i].second] = i + TEMPORARY_REGS + 1; // r(T+1) ~ r16
+      for (unsigned i = 0, sz = InstCount.size(); i < 16 - TEMP_REGS && i < sz; i++)
+        RegToRegMap[InstCount[i].second] = i + TEMP_REGS + 1; // r(T+1) ~ r16
 
       // either create alloca, or use register
       for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
