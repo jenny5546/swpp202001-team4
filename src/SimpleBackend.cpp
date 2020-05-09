@@ -7,12 +7,12 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_os_ostream.h"
+#include <string>
+#include <sstream>
+#include <memory>
 #include <algorithm>
 #include <iterator>
 #include <map>
-#include <memory>
-#include <string>
-#include <sstream>
 #include <vector>
 
 #define TEMP_REGS 8
