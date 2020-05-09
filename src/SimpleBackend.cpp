@@ -35,6 +35,8 @@ unsigned getAccessSize(Type *T) {
 // transformed to stack.
 class DepromoteRegisters : public InstVisitor<DepromoteRegisters> {
 private:
+  unsigned NextTempReg;
+
   LLVMContext *Context;
   IntegerType *I64Ty;
   IntegerType *I1Ty;
@@ -54,6 +56,7 @@ private:
   map<Instruction *, Instruction *> InstMap;
   map<Instruction *, unsigned> RegToRegMap;
   map<Instruction *, AllocaInst *> RegToAllocaMap;
+  vector<pair<Instruction *, Instruction *>> TempRegUsers;
 
   void raiseError(Instruction &I) {
     errs() << "DepromoteRegisters: Unsupported Instruction: " << I << "\n";
@@ -90,13 +93,21 @@ private:
     }
   }
 
-  unsigned getAssemblyRegister(Instruction *I) {
-    if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
-      return 1;
-    else
-      return RegToRegMap[I];
-  }
-  string assemblyRegisterName(unsigned registerId) {
+  string retrieveAssemblyRegister(Instruction *I) {
+    unsigned registerId;
+    if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
+      if (TempRegUsers[NextTempReg].first != nullptr) {
+        assert(TempRegUsers[NextTempReg].second != nullptr);
+        emitStoreToSrcRegister(TempRegUsers[NextTempReg].second,
+                                TempRegUsers[NextTempReg].first);
+      }
+      TempRegUsers[NextTempReg].first = I;
+      TempRegUsers[NextTempReg].second = nullptr;
+      unsigned temp = NextTempReg + 1;
+      NextTempReg = (NextTempReg + 1) % 3;
+      registerId = temp;
+    } else
+      registerId = RegToRegMap[I];
     assert(1 <= registerId && registerId <= 16);
     return "__r" + to_string(registerId) + "__";
   }
@@ -104,9 +115,19 @@ private:
     assert(RegToAllocaMap.count(I));
     assert(1 <= targetRegisterId && targetRegisterId <= 3 &&
            "only r1 ~ r3 are available for temporary storage!");
-    string RegName = assemblyRegisterName(targetRegisterId);
+    for (int i = 0; i < 3; i++) {
+      if (TempRegUsers[i].first == I && TempRegUsers[i].second != nullptr)
+        return TempRegUsers[i].second;
+    }
+    string RegName = retrieveAssemblyRegister(I);
     auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], RegName);
     checkTgtType(TgtVal->getType());
+    for (int i = 0; i < 3; i++) {
+      if (TempRegUsers[i].first == I) {
+        TempRegUsers[i].second = TgtVal;
+        break;
+      }
+    }
     return TgtVal;
   }
   void emitStoreToSrcRegister(Value *V, Instruction *I) {
@@ -117,12 +138,16 @@ private:
         assert(I->getName().startswith("__r"));
     Builder->CreateStore(V, RegToAllocaMap[I]);
   }
-  void emitStoreAndSave(Value *Res, Instruction *I) {
-    if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
-      emitStoreToSrcRegister(Res, I);
+  void saveInst(Value *Res, Instruction *I) {
     auto *NewI = dyn_cast<Instruction>(Res);
     assert(NewI);
     InstMap[I] = NewI;
+    for (int i = 0; i < 3; i++) {
+      if (TempRegUsers[i].first == I) {
+        TempRegUsers[i].second = NewI;
+        return;
+      }
+    }
   }
 
   // Encode the value of V.
@@ -247,7 +272,10 @@ public:
 
     Function *SourceFunc = BB.getParent();
     if (&BB == &SourceFunc->getEntryBlock()) {
-      // Let's create an alloca for each register..!
+      NextTempReg = 0;
+      TempRegUsers.clear();
+      for (unsigned i = 0; i < 3; i++) 
+        TempRegUsers.push_back(make_pair(nullptr, nullptr));
       IRBuilder<> IB(BBToEmit);
 
       // sort by number of usages
@@ -286,7 +314,7 @@ public:
       if (FuncToEmit->getName() == "main") {
         // Let's create a malloc for each global var.
         // This is dummy register.
-        string Reg1 = assemblyRegisterName(1);
+        string Reg1 = retrieveAssemblyRegister(nullptr);
         for (auto &[_, Size] : GVLocs) {
           auto *ArgTy =
             dyn_cast<IntegerType>(MallocFn->getFunctionType()->getParamType(0));
@@ -314,8 +342,8 @@ public:
     checkSrcType(I.getAllocatedType());
     // This will be lowered to 'r1 = add sp, <offset>'
     auto *NewAllc = Builder->CreateAlloca(I.getAllocatedType(),
-              I.getArraySize(), assemblyRegisterName(getAssemblyRegister(&I)));
-    emitStoreAndSave(NewAllc, &I);
+              I.getArraySize(), retrieveAssemblyRegister(&I));
+    saveInst(NewAllc, &I);
   }
   void visitLoadInst(LoadInst &LI) {
     checkSrcType(LI.getType());
@@ -327,16 +355,16 @@ public:
       // Need to zext.
       // before_zext__ will be recognized by the assembler & merged with 64-bit
       // load to a smaller load.
-      string Reg = assemblyRegisterName(getAssemblyRegister(&LI));
+      string Reg = retrieveAssemblyRegister(&LI);
       string RegBeforeZext = Reg + "before_zext__";
       LoadedVal = Builder->CreateLoad(TgtPtrOp, RegBeforeZext);
       LoadedVal = Builder->CreateZExt(LoadedVal, I64Ty, Reg);
     } else {
       LoadedVal = Builder->CreateLoad(TgtPtrOp, 
-                          assemblyRegisterName(getAssemblyRegister(&LI)));
+                          retrieveAssemblyRegister(&LI));
     }
     checkTgtType(LoadedVal->getType());
-    emitStoreAndSave(LoadedVal, &LI);
+    saveInst(LoadedVal, &LI);
   }
   void visitStoreInst(StoreInst &SI) {
     auto *Ty = SI.getValueOperand()->getType();
@@ -348,7 +376,8 @@ public:
       // 64bit -> Ty bit trunc is needed.
       // after_trunc__ will be recognized by the assembler & merged with 64-bit
       // store into a smaller store.
-      string R0Trunc = assemblyRegisterName(1) + "after_trunc__";
+      string R0Trunc = retrieveAssemblyRegister(nullptr)
+                                                             + "after_trunc__";
       assert(Ty->isIntegerTy() && TgtValOp->getType()->isIntegerTy());
       TgtValOp = Builder->CreateTrunc(TgtValOp, Ty, R0Trunc);
     }
@@ -383,21 +412,21 @@ public:
     auto *Op1 = translateSrcOperandToTgt(BO.getOperand(0), 1);
     auto *Op2 = translateSrcOperandToTgt(BO.getOperand(1), 2);
     auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, Ty,
-        assemblyRegisterName(1) + "after_trunc__");
+        retrieveAssemblyRegister(nullptr) + "after_trunc__");
     auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, Ty,
-        assemblyRegisterName(2) + "after_trunc__");
+        retrieveAssemblyRegister(nullptr) + "after_trunc__");
 
     Value *Res = nullptr;
     if (BO.getType() != I64Ty) {
-      string RegName = assemblyRegisterName(getAssemblyRegister(&BO));
+      string RegName = retrieveAssemblyRegister(&BO);
       Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
                                  RegName + "before_zext__");
       Res = Builder->CreateZExt(Res, I64Ty, RegName);
     } else {
       Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
-                      assemblyRegisterName(getAssemblyRegister(&BO)));
+                      retrieveAssemblyRegister(&BO));
     }
-    emitStoreAndSave(Res, &BO);
+    saveInst(Res, &BO);
   }
   void visitICmpInst(ICmpInst &II) {
     auto *OpTy = II.getOperand(0)->getType();
@@ -407,38 +436,39 @@ public:
     auto *Op1 = translateSrcOperandToTgt(II.getOperand(0), 1);
     auto *Op2 = translateSrcOperandToTgt(II.getOperand(1), 2);
     auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, OpTy,
-        assemblyRegisterName(1) + "after_trunc__");
+        retrieveAssemblyRegister(nullptr) + "after_trunc__");
     auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, OpTy,
-        assemblyRegisterName(2) + "after_trunc__");
+        retrieveAssemblyRegister(nullptr) + "after_trunc__");
 
     // i1 -> i64 zext
-    string Reg = assemblyRegisterName(getAssemblyRegister(&II));
+    string Reg = retrieveAssemblyRegister(&II);
     string Reg_before_zext = Reg + "before_zext__";
     auto *Res = Builder->CreateZExt(
         Builder->CreateICmp(II.getPredicate(), Op1Trunc, Op2Trunc,
         Reg_before_zext), I64Ty, Reg);
-    emitStoreAndSave(Res, &II);
+    saveInst(Res, &II);
   }
   void visitSelectInst(SelectInst &SI) {
     auto *Ty = SI.getType();
     auto *OpCond = translateSrcOperandToTgt(SI.getOperand(0), 1);
     assert(OpCond->getType() == I64Ty);
     // i64 -> i1 trunc
-    string R1Trunc = assemblyRegisterName(1) + "after_trunc__";
+    string R1Trunc = retrieveAssemblyRegister(nullptr)
+                                                         + "after_trunc__";
     OpCond = Builder->CreateTrunc(OpCond, I1Ty, R1Trunc);
 
     auto *OpLeft = translateSrcOperandToTgt(SI.getOperand(1), 2);
     auto *OpRight = translateSrcOperandToTgt(SI.getOperand(2), 3);
     
     auto *Res = Builder->CreateSelect(OpCond, OpLeft, OpRight, 
-                    assemblyRegisterName(getAssemblyRegister(&SI)));
-    emitStoreAndSave(Res, &SI);
+                    retrieveAssemblyRegister(&SI));
+    saveInst(Res, &SI);
   }
   void visitGetElementPtrInst(GetElementPtrInst &GEPI) {
     // Make it look like 'gep i8* ptr, i'
     auto *PtrOp = translateSrcOperandToTgt(GEPI.getPointerOperand(), 1);
     auto *PtrI8Op = Builder->CreateBitCast(PtrOp, I8PtrTy,
-                                           assemblyRegisterName(1));
+                        retrieveAssemblyRegister(nullptr));
     unsigned Idx = 1;
     Type *CurrentPtrTy = GEPI.getPointerOperandType();
 
@@ -452,7 +482,7 @@ public:
       if (sz != 1) {
         assert(sz != 0);
         IdxValue = Builder->CreateMul(IdxValue, ConstantInt::get(I64Ty, sz),
-                                      assemblyRegisterName(2));
+                            retrieveAssemblyRegister(nullptr));
       }
 
       bool isZero = false;
@@ -460,7 +490,8 @@ public:
         isZero = CI->getZExtValue() == 0;
 
       if (!isZero)
-        PtrI8Op = Builder->CreateGEP(PtrI8Op, IdxValue, assemblyRegisterName(1));
+        PtrI8Op = Builder->CreateGEP(PtrI8Op, IdxValue, 
+                            retrieveAssemblyRegister(nullptr));
 
       if (!ElemTy->isArrayTy()) {
         CurrentPtrTy = nullptr;
@@ -471,29 +502,30 @@ public:
     }
 
     PtrOp = Builder->CreateBitCast(PtrI8Op, GEPI.getType(),
-                      assemblyRegisterName(getAssemblyRegister(&GEPI)));
-    emitStoreAndSave(PtrOp, &GEPI);
+                      retrieveAssemblyRegister(&GEPI));
+    saveInst(PtrOp, &GEPI);
   }
 
   // ---- Casts ----
   void visitBitCastInst(BitCastInst &BCI) {
     auto *Op = translateSrcOperandToTgt(BCI.getOperand(0), 1);
     auto *CastedOp = Builder->CreateBitCast(Op, BCI.getType(),
-              assemblyRegisterName(getAssemblyRegister(&BCI)));
-    emitStoreAndSave(CastedOp, &BCI);
+              retrieveAssemblyRegister(&BCI));
+    saveInst(CastedOp, &BCI);
   }
   void visitSExtInst(SExtInst &SI) {
     // Get the sign bit.
     uint64_t bw = SI.getOperand(0)->getType()->getIntegerBitWidth();
     auto *Op = translateSrcOperandToTgt(SI.getOperand(0), 1);
     auto *AndVal =
-      Builder->CreateAnd(Op, (1llu << (bw - 1)), assemblyRegisterName(2));
+      Builder->CreateAnd(Op, (1llu << (bw - 1)), 
+                         retrieveAssemblyRegister(nullptr));
     auto *NegVal =
       Builder->CreateSub(ConstantInt::get(I64Ty, 0), AndVal,
-                         assemblyRegisterName(2));
+                         retrieveAssemblyRegister(nullptr));
     auto *ResVal = Builder->CreateOr(NegVal, Op, 
-                          assemblyRegisterName(getAssemblyRegister(&SI)));
-    emitStoreAndSave(ResVal, &SI);
+                          retrieveAssemblyRegister(&SI));
+    saveInst(ResVal, &SI);
   }
   void visitZExtInst(ZExtInst &ZI) {
     // Everything is zero-extended by default.
@@ -504,20 +536,20 @@ public:
     auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
     uint64_t Mask = (1llu << (TI.getDestTy()->getIntegerBitWidth())) - 1;
     auto *Res = Builder->CreateAnd(Op, Mask, 
-                          assemblyRegisterName(getAssemblyRegister(&TI)));
-    emitStoreAndSave(Res, &TI);
+                          retrieveAssemblyRegister(&TI));
+    saveInst(Res, &TI);
   }
   void visitPtrToIntInst(PtrToIntInst &PI) {
     auto *Op = translateSrcOperandToTgt(PI.getOperand(0), 1);
     auto *Res = Builder->CreatePtrToInt(Op, I64Ty, 
-                          assemblyRegisterName(getAssemblyRegister(&PI)));
-    emitStoreAndSave(Res, &PI);
+                          retrieveAssemblyRegister(&PI));
+    saveInst(Res, &PI);
   }
   void visitIntToPtrInst(IntToPtrInst &II) {
     auto *Op = translateSrcOperandToTgt(II.getOperand(0), 1);
     auto *Res = Builder->CreateIntToPtr(Op, II.getType(),
-                            assemblyRegisterName(getAssemblyRegister(&II)));
-    emitStoreAndSave(Res, &II);
+                            retrieveAssemblyRegister(&II));
+    saveInst(Res, &II);
   }
 
   // ---- Call ----
@@ -534,8 +566,8 @@ public:
     }
     if (CI.hasName()) {
       Value *Res = Builder->CreateCall(CalledFInTgt, Args,
-                    assemblyRegisterName(getAssemblyRegister(&CI)));
-      emitStoreAndSave(Res, &CI);
+                    retrieveAssemblyRegister(&CI));
+      saveInst(Res, &CI);
     } else {
       Builder->CreateCall(CalledFInTgt, Args);
     }
@@ -559,7 +591,7 @@ public:
     } else {
       auto *CondOp = translateSrcOperandToTgt(BI.getCondition(), 1);
       // to_i1__ is recognized by assembler.
-      string regname = assemblyRegisterName(1) + "to_i1__";
+      string regname = retrieveAssemblyRegister(nullptr) + "to_i1__";
       auto *Condi1 = Builder->CreateICmpNE(CondOp, ConstantInt::get(I64Ty, 0),
                                            regname);
       Builder->CreateCondBr(Condi1, BBMap[BI.getSuccessor(0)],
