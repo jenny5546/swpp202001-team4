@@ -15,6 +15,8 @@
 #include <sstream>
 #include <vector>
 
+#define TEMPORARY_REGS 8
+
 using namespace llvm;
 using namespace std;
 
@@ -35,8 +37,6 @@ unsigned getAccessSize(Type *T) {
 // transformed to stack.
 class DepromoteRegisters : public InstVisitor<DepromoteRegisters> {
 private:
-  unsigned NextTempReg;
-
   LLVMContext *Context;
   IntegerType *I64Ty;
   IntegerType *I1Ty;
@@ -56,7 +56,7 @@ private:
   map<Instruction *, Instruction *> InstMap;
   map<Instruction *, unsigned> RegToRegMap;
   map<Instruction *, AllocaInst *> RegToAllocaMap;
-  vector<pair<Instruction *, Instruction *>> TempRegUsers;
+  vector<pair<Instruction *, pair<Instruction *, unsigned>>> TempRegUsers;
 
   void raiseError(Instruction &I) {
     errs() << "DepromoteRegisters: Unsupported Instruction: " << I << "\n";
@@ -96,35 +96,40 @@ private:
   string retrieveAssemblyRegister(Instruction *I) {
     unsigned registerId;
     if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
-      if (TempRegUsers[NextTempReg].first != nullptr) {
-        assert(TempRegUsers[NextTempReg].second != nullptr);
-        emitStoreToSrcRegister(TempRegUsers[NextTempReg].second,
-                                TempRegUsers[NextTempReg].first);
+      for (int i = 0; i < TEMPORARY_REGS; i++) {
+        if (TempRegUsers[i].first == nullptr) {
+          TempRegUsers[i].first = I;
+          TempRegUsers[i].second.first = nullptr;
+          return "__r" + to_string(TempRegUsers[i].second.second) + "__";
+        }
       }
-      TempRegUsers[NextTempReg].first = I;
-      TempRegUsers[NextTempReg].second = nullptr;
-      unsigned temp = NextTempReg + 1;
-      NextTempReg = (NextTempReg + 1) % 3;
-      registerId = temp;
-    } else
+      emitStoreToSrcRegister(TempRegUsers[0].second.first, TempRegUsers[0].first);
+      unsigned registerId = TempRegUsers[0].second.second;
+      TempRegUsers.erase(TempRegUsers.begin());
+      TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
+      return "__r" + to_string(registerId) + "__";
+    } else {
       registerId = RegToRegMap[I];
-    assert(1 <= registerId && registerId <= 16);
-    return "__r" + to_string(registerId) + "__";
+      assert(1 <= registerId && registerId <= 16);
+      return "__r" + to_string(registerId) + "__";
+    }
   }
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId) {
     assert(RegToAllocaMap.count(I));
-    assert(1 <= targetRegisterId && targetRegisterId <= 3 &&
-           "only r1 ~ r3 are available for temporary storage!");
-    for (int i = 0; i < 3; i++) {
-      if (TempRegUsers[i].first == I && TempRegUsers[i].second != nullptr)
-        return TempRegUsers[i].second;
+    assert(1 <= targetRegisterId && targetRegisterId <= TEMPORARY_REGS &&
+           "register ID out of bounds for temporary storage!");
+    for (int i = 0; i < TEMPORARY_REGS; i++) {
+      if (TempRegUsers[i].first == I) {
+        assert(TempRegUsers[i].second.first != nullptr);
+        return TempRegUsers[i].second.first;
+      }
     }
     string RegName = retrieveAssemblyRegister(I);
     auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], RegName);
     checkTgtType(TgtVal->getType());
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < TEMPORARY_REGS; i++) {
       if (TempRegUsers[i].first == I) {
-        TempRegUsers[i].second = TgtVal;
+        TempRegUsers[i].second.first = TgtVal;
         break;
       }
     }
@@ -142,9 +147,9 @@ private:
     auto *NewI = dyn_cast<Instruction>(Res);
     assert(NewI);
     InstMap[I] = NewI;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < TEMPORARY_REGS; i++) {
       if (TempRegUsers[i].first == I) {
-        TempRegUsers[i].second = NewI;
+        TempRegUsers[i].second.first = NewI;
         return;
       }
     }
@@ -272,10 +277,9 @@ public:
 
     Function *SourceFunc = BB.getParent();
     if (&BB == &SourceFunc->getEntryBlock()) {
-      NextTempReg = 0;
       TempRegUsers.clear();
-      for (unsigned i = 0; i < 3; i++) 
-        TempRegUsers.push_back(make_pair(nullptr, nullptr));
+      for (unsigned i = 0; i < TEMPORARY_REGS; i++) 
+        TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
       IRBuilder<> IB(BBToEmit);
 
       // sort by number of usages
@@ -297,8 +301,9 @@ public:
       reverse(InstCount.begin(), InstCount.end()); // descending order
 
       // choose 13 instructions to keep in register
-      for (unsigned i = 0, sz = InstCount.size(); i < 13 && i < sz; i++)
-        RegToRegMap[InstCount[i].second] = i + 4; // r4 ~ r16
+      for (unsigned i = 0, sz = InstCount.size(); 
+                                        i < 16 - TEMPORARY_REGS && i < sz; i++)
+        RegToRegMap[InstCount[i].second] = i + TEMPORARY_REGS + 1; // r(T+1) ~ r16
 
       // either create alloca, or use register
       for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
