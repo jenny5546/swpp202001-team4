@@ -15,8 +15,13 @@ PreservedAnalyses ArithmeticPass::run(Function &F, FunctionAnalysisManager &FAM)
         
         // if add (X,X) -> mul(X,2)
         if(match(&I, m_Add(m_Value(X),m_Deferred(X)))){
-          newInst = BinaryOperator::Create(Instruction::Mul,I.getOperand(0),ConstantInt::get(I.getOperand(0)->getType(),2));
-          ReplaceInstWithInst(&I,newInst);
+          auto *temp = BinaryOperator::Create(Instruction::Mul,I.getOperand(0),ConstantInt::get(I.getOperand(0)->getType(),2),I.getName());
+          newInst = dyn_cast<Instruction>(temp);
+          assert(newInst);
+          I.replaceAllUsesWith(newInst);
+          //ReplaceInstWithInst(&I,newInst);
+          // newInst = BinaryOperator::Create(Instruction::Mul,I.getOperand(0),ConstantInt::get(I.getOperand(0)->getType(),2));
+          // ReplaceInstWithInst(&I,newInst);
           //BinaryOperator *BI = dyn_cast<BinaryOperator>(&I);
         }
         // if sub (X,X) -> 0
@@ -26,6 +31,7 @@ PreservedAnalyses ArithmeticPass::run(Function &F, FunctionAnalysisManager &FAM)
         }
         // if shl (X,Constant) -> X * 2^Constant
         else if(match(&I,m_Shl(m_Value(X),m_ConstantInt(C)))){
+          newInst = BinaryOperator::Create(Instruction::Mul,I.getOperand(0),ConstantInt::get(I.getOperand(0)->getType(),2));
 
         }
         // if shr (X,Constant) -> X * 2^Constant
