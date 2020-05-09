@@ -4,3 +4,6 @@ sf-compiler-tests
 .vscode
 obj
 .tmp.s
+input.ll
+a.out
+a.s

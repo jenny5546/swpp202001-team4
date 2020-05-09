@@ -90,7 +90,9 @@ int main(int argc, char **argv) {
   ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
+  MPM.addPass(FunctionOutlinePass());
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
+  
 
   // Run!
   MPM.run(*M, MAM);
