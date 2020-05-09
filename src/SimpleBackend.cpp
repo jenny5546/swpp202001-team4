@@ -358,8 +358,7 @@ public:
       LoadedVal = Builder->CreateLoad(TgtPtrOp, RegBeforeZext);
       LoadedVal = Builder->CreateZExt(LoadedVal, I64Ty, Reg);
     } else {
-      LoadedVal = Builder->CreateLoad(TgtPtrOp, 
-                          retrieveAssemblyRegister(&LI));
+      LoadedVal = Builder->CreateLoad(TgtPtrOp, retrieveAssemblyRegister(&LI));
     }
     checkTgtType(LoadedVal->getType());
     saveInst(LoadedVal, &LI);
@@ -374,8 +373,7 @@ public:
       // 64bit -> Ty bit trunc is needed.
       // after_trunc__ will be recognized by the assembler & merged with 64-bit
       // store into a smaller store.
-      string R0Trunc = retrieveAssemblyRegister(nullptr)
-                                                             + "after_trunc__";
+      string R0Trunc = retrieveAssemblyRegister(nullptr) + "after_trunc__";
       assert(Ty->isIntegerTy() && TgtValOp->getType()->isIntegerTy());
       TgtValOp = Builder->CreateTrunc(TgtValOp, Ty, R0Trunc);
     }
