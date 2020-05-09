@@ -93,6 +93,7 @@ private:
     }
   }
 
+
   string retrieveAssemblyRegister(Instruction *I) {
     unsigned registerId;
     if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
@@ -276,36 +277,36 @@ public:
       TempRegUsers.clear();
       for (unsigned i = 0; i < TEMP_REGS; i++) 
         TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
-      IRBuilder<> IB(BBToEmit);
 
-      // sort by number of usages
-      vector<pair<unsigned, Instruction *>> InstCount;
+      vector<pair<unsigned, Instruction *>> InstCount; // sort by number of usages
       for (auto I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc); I != E; ++I) {
         if (!I->hasName() || dyn_cast<ZExtInst>(&*I) || dyn_cast<PHINode>(&*I))
           continue;
         auto SingleInstCount = make_pair(0, &*I);
         for (auto itr = (*I).use_begin(), end = (*I).use_end(); itr != end; ++itr) {
-            if (dyn_cast<Instruction>((*itr).getUser())) // Not an instruction instance
+            if (dyn_cast<Instruction>((*itr).getUser())) // an instruction instance
               SingleInstCount.first++;
         }
         InstCount.push_back(SingleInstCount);
       }
       sort(InstCount.begin(), InstCount.end()); 
       reverse(InstCount.begin(), InstCount.end()); // descending order
-
-      // choose 13 instructions to keep in register
+      
+      // either create alloca, or use register
       for (unsigned i = 0, sz = InstCount.size(); i < 16 - TEMP_REGS && i < sz; i++)
         RegToRegMap[InstCount[i].second] = i + TEMP_REGS + 1; // r(T+1) ~ r16
-
+      
       // either create alloca, or use register
+      IRBuilder<> IB(BBToEmit); 
       for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
            I != E; ++I) {
         if (I->hasName()) {
           auto *Ty = I->getType();
           checkSrcType(Ty);
-          if (!RegToRegMap.count(&*I))
-            RegToAllocaMap[&*I] =
-              IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
+          if (RegToRegMap.count(&*I))
+            continue;
+          RegToAllocaMap[&*I] =
+            IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
         }
       }
       if (FuncToEmit->getName() == "main") {
