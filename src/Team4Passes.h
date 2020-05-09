@@ -54,62 +54,69 @@ public:
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
 
-    /* Case 1. If a single block uses more than 16 registers, just break 
-    into another function. No need to check for post dominance relations */
+    /* [Most Simple Case] If a single function with only an entry block uses more than 13 registers, 
+    just break into another function. No need to check for post dominance relations */
 
     for (auto &F : M){
         for (auto &BB : F ){
-            // outs()<<"start of block\n";
+
+            // outs()<<"Start of Block\n";
             vector<Instruction *> unOutlinedInsts;
             vector<Instruction *> outlinedInsts;
             vector<Value *> dependentRegs;
             bool outLined = false;
             int regs = 0;
+            Instruction *pointToInsert; 
 
             /*  1. Iterate through Basic Block, push instructions to outline, 
             only if the basic block uses more than 14 resistors. */
 
             for (auto &I : BB){
+
                 /* Registers have names %x = (some instruction).
                 Keep track of the number of regs.*/
-                if (I.hasName()){
+
+                if (I.hasName()){ // Regs with name in characters
                     regs ++;   
                 }
-                if (!I.hasName() && !I.getType()->isVoidTy()){
+                if (!I.hasName() && !I.getType()->isVoidTy()){ // Regs that have names like %0, %1.. rename them.
                     I.setName("temp");
                     regs ++;
                 }
+
                 if (regs<=13){ // If number of registers exceed 13 in one block, split.
                     unOutlinedInsts.push_back(&I); 
                 }
                 if (regs > 13 && !I.isTerminator()){ // Push back outlined insts to a vector 
+                    pointToInsert = &I;
                     outLined = true;
                     outlinedInsts.push_back(&I);
                 } 
+
             }
 
             /*  2. If outline_signal is true, push dependent registers to use as function args */
 
             if (outLined){
 
-                // 1. Outline function uses regs from the previous insts. (Dependent!)
+                /* 1. Outline function uses regs from the previous insts. (Dependent!) */
                 for(auto ai = F.arg_begin(), ae = F.arg_end(); ai != ae; ++ai){
                     if (hasUser(dyn_cast<Value>(ai),outlinedInsts)){
                         dependentRegs.push_back(ai);
                     }
                 }
-                // 2. Outline function uses the func parameters. (Dependent!)
+                /* 2. Outline function uses the func parameters. (Dependent!) */
                 for (auto i : unOutlinedInsts){
                     if (hasUser(i,outlinedInsts)){
                         // outs()<<"instr with user"<<i->getName()<<"\n";
                         dependentRegs.push_back(i);
                     }
                 }
-                
                 /*  3. Create the new outlined function  */
                 vector<Type*> ArgTypes;
 
                 // Get argument types from the 'dependentRegs'
+
                 for (auto &r : dependentRegs){
                     ArgTypes.push_back(r->getType());
                 }
@@ -121,10 +128,34 @@ public:
                                         FunctionName, F.getParent());
                 
                 Function::arg_iterator args = OutlinedF->arg_begin();
+
                 for (auto &r : dependentRegs){
                     args->setName(r->getName());
-                    &*args++;
+                    &*args++; // FIXME: This results in warning: expression result unused [-Wunused-value] 
                 }
+                
+                /*  4. Now, copy the 'need-to-outline' instructions to the outlined function  */
+
+                BasicBlock* EntryBlock = BasicBlock::Create(M.getContext(), "entry", OutlinedF);
+                IRBuilder<> builder(EntryBlock);
+                builder.SetInsertPoint(EntryBlock);
+                builder.CreateRet(builder.getInt32(0));
+                // verifyFunction(*OutlinedF);
+                // M.dump();
+                
+                for (auto &I : outlinedInsts){
+                    Instruction* inst = I->clone();
+                    inst->setName(I->getName());
+                    // outs()<<"cloned instruction: "<<inst->getOperand(0)->getName()<<"\n";
+                    inst->dropAllReferences();
+                    inst->setDebugLoc(DebugLoc());
+                    builder.Insert(inst);
+                }
+
+                /* 5. Add an instruction to call the outlined function */
+                // Constant* hook = M.getOrInsertFunction(OutlinedF, FTy);
+                
+
 
                 //* Print for debugging purposes *// 
 
