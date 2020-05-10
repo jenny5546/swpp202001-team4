@@ -51,7 +51,7 @@ class DoNothingPass : public llvm::PassInfoMixin<DoNothingPass> {
 
 public:
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM) {
-    //outs() << "Hi! " << F.getName() << "\n";
+    outs() << "Hi! " << F.getName() << "\n";
     return PreservedAnalyses::all();
   }
 };
@@ -85,7 +85,8 @@ int main(int argc, char **argv) {
 
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
-  FPM.addPass(DoNothingPass());
+  //FPM.addPass(DoNothingPass());
+  FPM.addPass(Malloc2AllocPass());
 
   ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));

@@ -20,6 +20,9 @@ test: sf-compiler-tests
 	@./sf-compiler-tests
 	@./run-filechecks.sh $(FILECHECK_PATH)
 
+obj/Malloc2Alloc.o: src/Malloc2Alloc.cpp $(DEPS)
+	@$(CXX) $(CXXFLAGS) -c -o $@ $<
+	
 obj/SimpleBackend.o: src/SimpleBackend.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
 
