@@ -9,33 +9,14 @@
  * replace it into a function call.
 
 ********************************************/ 
-
-
-// class FunctionOutlinePass : public llvm::PassInfoMixin<FunctionOutlinePass> {
-
-    /* Helper function to pass 'depdendent regs' as arguments to the new outlined function */
-    //Return true if value I is used in one of the instructions in the vector
-
-//     bool hasUser(Value *I, vector<Instruction *> vect){
-//         for (Use &U : I->uses()) {
-//             User *Usr = U.getUser();
-//             Instruction *UsrI = dyn_cast<Instruction>(Usr); 
-//             if (find(vect.begin(), vect.end(), Usr)!= vect.end()) { 
-//                 return true;
-//             }
-//         }
-//         return false;
-//     }
-
-// public:
-
-  PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM) {
+PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM) {
 
     /* [Most Simple Case] If a single function with only an entry block uses more than 13 registers, 
     just break into another function. No need to check for post dominance relations */
 
     for (auto &F : M){
         unsigned countBB = 0;
+
         for (auto &BB : F){
             countBB++;
         }
@@ -53,9 +34,7 @@
 
             /*  1. Iterate through Basic Block, push instructions to outline, 
             only if the basic block uses more than 14 resistors. */
-
             for (auto &I : BB){
-
 
                 /* Registers have names %x = (some instruction).
                 Keep track of the number of regs.*/
@@ -94,7 +73,6 @@
                 CodeExtractorAnalysisCache CEAC(F);
                 Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
 
-                
                 /* 1. Outline function uses regs from the previous insts. (Dependent!) */
                 // for(auto ai = F.arg_begin(), ae = F.arg_end(); ai != ae; ++ai){
                 //     if (hasUser(dyn_cast<Value>(ai),outlinedInsts)){
@@ -150,28 +128,19 @@
 
                 /* 5. Add an instruction to call the outlined function */
                 // Constant* hook = M.getOrInsertFunction(OutlinedF, FTy);
-                
-
-
                 //* Print for debugging purposes *// 
-
                 // for (auto &I : outlinedInsts){
                 //     outs()<<"outlined instructions"<< I->getName()<<"\n";
                 // }
-
                 // for (auto &r : dependentRegs){
                 //     outs()<<"depndent registers"<< r->getName()<<"\n";
                 // }
-
                 // for(auto ai = OutlinedF->arg_begin(), ae = OutlinedF->arg_end(); ai != ae; ++ai){
                 //     outs()<<"copy arguments:"<< ai->getName()<<"\n";
                 // }
             }
 
-            
-            
             // M.getFunctionList().push_back(OutlinedF);
-
             // outs()<<"size of vec: "<<dependentRegs.size()<<"\n";
             // for (auto &i : outlinedInsts){
             //     outs()<<"Outlined Instructions: "<<i->getName()<<"\n";
@@ -179,33 +148,13 @@
 
         }
         vector <Instruction*> toErase;
-
         for (auto &BB : F ){
             for (auto &I: BB){
                 if (auto *CI = dyn_cast<CallInst>(&I)){
                     Function *calledfunc = CI->getCalledFunction();
                     bool found = false;
-                    outs() << *CI << "\n";
-                    // if (calledfunc->getName()!= "write" && calledfunc->getName()!= "read"){
-                    //     outs() << calledfunc->getName() << "\n";
-                    //     for (auto &F : M){
-                    //         if (calledfunc == &F){
-                    //             found=true;
-                    //             break;
-                    //         }
-                    //         // if (calledfunc->getLinkage()){
-                    //         //     found=true;
-                    //         //     break;
-                    //         // }
-                    //     }
-                    //     outs() << to_string(found) << "\n";
-                    //     if (!found){
-                    //         toErase.push_back(&I);
-                    //     }
-                    // }
-                    // if (calledfunc->getName()== "llvm.lifetime.start" || calledfunc->getName()== "llvm.lifetime.end"){
-                    //     toErase.push_back(&I);
-                    // }
+                    // outs() << *CI << "\n";
+                    
                     if (calledfunc->isIntrinsic()){
                         toErase.push_back(&I);
                     }
@@ -213,36 +162,11 @@
                 }
             }
         }
-
         for (auto I : toErase){
             I->eraseFromParent();
         }        
     }
-    
-
     return PreservedAnalyses::all();
-  }
+}
 
 
-
-
-// Function *OutlinedFunction = Function::Create(FunctionType::)
-// Instruction *breakpoint = dyn_cast<Instruction>(&I);
-// IRBuilder<> Builder(breakpoint);
-// Builder.CreateCall()
-// Instruction *newInst = new Instruction(...); 
-// // Instruction *functionCall = new Instruction();
-
-// BB.getInstList().insertAfter(breakpoint, functionCall);
-// 1. Pack leftover instructions, make it an outlined function.
-// : Dependent registers should be parameters, check for return values
-// 2. Insert function call to the block.
-// 3. Remove the instructions in the block.
-// 4. Return properly 
-
-/*
-Try: 
-BasicBlock* succ = bb->splitBasicBlock();
-bb->getTerminator()->eraseFromParent();
-BranchInst::Create(<ifTrue>, <ifFalse>, <cond>, bb);
-*/
