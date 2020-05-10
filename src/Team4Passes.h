@@ -6,7 +6,13 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include <vector>
 #include <string>
+#include <algorithm>
 
 using namespace std;
 using namespace llvm;
