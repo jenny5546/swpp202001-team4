@@ -35,6 +35,12 @@
     just break into another function. No need to check for post dominance relations */
 
     for (auto &F : M){
+        unsigned countBB = 0;
+        for (auto &BB : F){
+            countBB++;
+        }
+        // unsigned countBB = F.size();
+        // outs()<<"number of basic blocks" << F.getName() << countBB<<"\n";
         for (auto &BB : F ){
 
             // outs()<<"Start of Block\n";
@@ -78,7 +84,7 @@
 
             /*  2. If outline_signal is true, push dependent registers to use as function args */
 
-            if (outLined){
+            if (outLined && countBB==1){
 
                 BasicBlock *succ = BB.splitBasicBlock(pointToInsert, "outline");
                 BB.getTerminator()->eraseFromParent();

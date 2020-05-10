@@ -18,14 +18,6 @@ using namespace std;
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-/* add following lines
-
-class DoSomethingPass : public llvm::PassInfoMixin<DoSomethingPass> {
-public:
-    PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
-};
-
-*/
 
 class FunctionOutlinePass : public llvm::PassInfoMixin<FunctionOutlinePass> {
 public:
