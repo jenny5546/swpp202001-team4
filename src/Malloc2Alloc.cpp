@@ -68,7 +68,7 @@
                     SmallPtrSet<Instruction *, 4> MallocCalls;
                     MallocCalls.insert(I);
                     auto *freeptr = GetUnderlyingObject(CI->getOperand(0),DL);
-                    outs() << "Getunderlyingobject gets : " << *freeptr<<"\n";
+                    //outs() << "Getunderlyingobject gets : " << *freeptr<<"\n";
                     // Check if pointer freed by Fre inst CI points to the same block allocated by Malloc inst I.
                     if(MallocCalls.count(cast<Instruction>(freeptr))) {
                         //outs()<<*I<< " is freed by "<<*CI<<"\n";
@@ -95,7 +95,7 @@
           auto *CI = dyn_cast<CallInst>(I);
           Type *MallocType = getMallocAllocatedType(CI, &TLI);
           Value *MallocSize = getMallocArraySize(CI, DL, &TLI, true);
-          outs()<<"MallocType : "<<*MallocType<<"\nMallocSize : "<<*MallocSize<<"\n";
+          //outs()<<"MallocType : "<<*MallocType<<"\nMallocSize : "<<*MallocSize<<"\n";
           IB.SetInsertPoint(CI);
           //Value *Alloca = IB.CreateBitCast(IB.CreateAlloca(MallocType, MallocSize),CI->getType());
           Value *Alloca = IB.CreateAlloca(MallocType, MallocSize);
@@ -120,13 +120,13 @@
 
     findReplaceableMallocs(F,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
     //outs()<<ReplaceableMallocs.size()<<"\n";
-    for(auto *I : ReplaceableMallocs) {
+    /*for(auto *I : ReplaceableMallocs) {
         outs()<<"Replace Malloc : "<<*I<<"\n";
     }
     //outs()<<RemovableFrees.size()<<"\n";
     for(auto *I : RemovableFrees) {
         outs()<<"Remove Free : "<<*I<<"\n";
-    }
+    }*/
 
     replaceMallocwithAlloc(F, FAM, ReplaceableMallocs,RemovableFrees);
 
