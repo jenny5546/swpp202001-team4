@@ -53,10 +53,10 @@ private:
   vector<pair<uint64_t, uint64_t>> GVLocs; // (Global var addr, size) info
   map<Argument *, Argument *> ArgMap;
   map<BasicBlock *, BasicBlock *> BBMap;
-  map<Instruction *, Instruction *> InstMap;
+  map<Instruction *, Value *> InstMap;
   map<Instruction *, unsigned> RegToRegMap;
   map<Instruction *, AllocaInst *> RegToAllocaMap;
-  vector<pair<Instruction *, pair<Instruction *, unsigned>>> TempRegUsers;
+  vector<pair<Instruction *, pair<Value *, unsigned>>> TempRegUsers;
 
   void raiseError(Instruction &I) {
     errs() << "DepromoteRegisters: Unsupported Instruction: " << I << "\n";
@@ -138,15 +138,13 @@ private:
     Builder->CreateStore(V, RegToAllocaMap[I]);
   }
   void saveInst(Value *Res, Instruction *I) {
-    auto *NewI = dyn_cast<Instruction>(Res);
-    assert(NewI);
-    InstMap[I] = NewI;
-    saveTempInst(I, NewI);
+    InstMap[I] = Res;
+    saveTempInst(I, Res);
   }
-  void saveTempInst(Instruction *OldI, Instruction *NewI) {
+  void saveTempInst(Instruction *OldI, Value *Res) {
     for (unsigned i = 0; i < TEMP_REGS; i++) {
       if (TempRegUsers[i].first == OldI) {
-        TempRegUsers[i].second.first = NewI;
+        TempRegUsers[i].second.first = Res;
         return;
       }
     }
