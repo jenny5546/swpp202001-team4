@@ -7,21 +7,7 @@ target triple = "x86_64-apple-macosx10.14.0"
 define i32 @propIntEq(i64 %x, i64 %y) #0 {
 ; CHECK: start propIntEq 2:
 entry:
-  %add = add i64 %x, %x
-  %add1 = add i64 %y, %y
-  %cmp = icmp eq i64 %add, %add1
-  br i1 %cmp, label %if.then, label %if.end
-
-if.then:                                          ; preds = %entry
-  br label %if.end
-
-if.end:                                           ; preds = %if.then, %entry
-  %e.0 = phi i64 [ 4, %if.then ], [ 0, %entry ]
-  %add2 = add i64 %e.0, %add
-  %add3 = add i64 %add2, %add1
-  %conv = trunc i64 %add3 to i32
-  ret i32 %conv
-; CHECK: sp = sub sp 56 64
+; CHECK: sp = sub sp 64 64
 ; CHECK-NEXT: r1 = mul arg1 2 64
 ; CHECK-NEXT: store 8 r1 sp 0
 ; CHECK-NEXT: r1 = mul arg2 2 64
@@ -30,22 +16,42 @@ if.end:                                           ; preds = %if.then, %entry
 ; CHECK-NEXT: r2 = load 8 sp 8
 ; CHECK-NEXT: r1 = icmp eq r1 r2 64
 ; CHECK-NEXT: store 8 r1 sp 16
-; CHECK-NEXT: r1 = load 8 sp 16
-; CHECK-NEXT: r1 = select r1 4 0
-; CHECK-NEXT: store 8 r1 sp 24
-; CHECK-NEXT: r1 = load 8 sp 24
-; CHECK-NEXT: r2 = load 8 sp 0
-; CHECK-NEXT: r1 = add r1 r2 64
-; CHECK-NEXT: store 8 r1 sp 32
+; CHECK-NEXT: store 8 0 sp 32
 ; CHECK-NEXT: r1 = load 8 sp 32
-; CHECK-NEXT: r2 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 r2 64
-; CHECK-NEXT: store 8 r1 sp 40
-; CHECK-NEXT: r1 = load 8 sp 40
-; CHECK-NEXT: r1 = and r1 4294967295 64
-; CHECK-NEXT: store 8 r1 sp 48
-; CHECK-NEXT: r1 = load 8 sp 48
-; CHECK-NEXT: ret r1
+; CHECK-NEXT: store 8 r1 sp 24
+; CHECK-NEXT: r1 = load 8 sp 16
+; CHECK-NEXT: br r1 .if.then .if.end
+  %add = add i64 %x, %x
+  %add1 = add i64 %y, %y
+  %cmp = icmp eq i64 %add, %add1
+  br i1 %cmp, label %if.then, label %if.end
+
+if.then:                                           ; preds = %entry
+; CHECK: store 8 4 sp 32
+; CHECK-NEXT: r1 = load 8 sp 32
+; CHECK-NEXT: store 8 r1 sp 24
+; CHECK-NEXT: br .if.end                                          
+  br label %if.end
+
+if.end:                                           ; preds = %if.then, %entry
+; CHECK:  r1 = load 8 sp 24
+; CHECK-NEXT:  r2 = load 8 sp 0
+; CHECK-NEXT:  r1 = add r1 r2 64
+; CHECK-NEXT:  store 8 r1 sp 40
+; CHECK-NEXT:  r1 = load 8 sp 40
+; CHECK-NEXT:  r2 = load 8 sp 8
+; CHECK-NEXT:  r1 = add r1 r2 64
+; CHECK-NEXT:  store 8 r1 sp 48
+; CHECK-NEXT:  r1 = load 8 sp 48
+; CHECK-NEXT:  r1 = and r1 4294967295 64
+; CHECK-NEXT:  store 8 r1 sp 56
+; CHECK-NEXT:  r1 = load 8 sp 56
+; CHECK-NEXT:  ret r1
+  %e.0 = phi i64 [ 4, %if.then ], [ 0, %entry ]
+  %add2 = add i64 %e.0, %add
+  %add3 = add i64 %add2, %add1
+  %conv = trunc i64 %add3 to i32
+  ret i32 %conv
 }
 ; CHECK: end propIntEq
 
@@ -59,6 +65,23 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 define i32 @main() #0 {
 ; CHECK: start main 0:
 entry:
+; CHECK: sp = sub sp 32 64
+; CHECK-NEXT: r1 = call read
+; CHECK-NEXT: store 8 r1 sp 0
+; CHECK-NEXT: r1 = call read
+; CHECK-NEXT: store 8 r1 sp 8
+; CHECK-NEXT: r1 = load 8 sp 0
+; CHECK-NEXT: r2 = load 8 sp 8
+; CHECK-NEXT: r1 = call propIntEq r1 r2
+; CHECK-NEXT: store 8 r1 sp 16
+; CHECK-NEXT: r1 = load 8 sp 16
+; CHECK-NEXT: r2 = and r1 2147483648 64
+; CHECK-NEXT: r2 = sub 0 r2 64
+; CHECK-NEXT: r1 = or r2 r1 64
+; CHECK-NEXT: store 8 r1 sp 24
+; CHECK-NEXT: r1 = load 8 sp 24
+; CHECK-NEXT: call write r1
+; CHECK-NEXT: ret 0
   %call = call i64 (...) @read()
   %call1 = call i64 (...) @read()
   %call2 = call i32 @propIntEq(i64 %call, i64 %call1)

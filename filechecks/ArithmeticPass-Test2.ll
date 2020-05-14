@@ -6,10 +6,11 @@ target triple = "x86_64-apple-macosx10.14.0"
 ; Function Attrs: nounwind ssp uwtable
 define i32 @doShift(i64 %x, i64 %y, i64 %z) #0 {
 ; CHECK: start doShift 3:
-; CHECK-NEXT: sp = sub sp 64 64
-; CHECK-NEXT: r1 = udiv arg1 8 64
+entry:
+; CHECK: sp = sub sp 64 64
+; CHECK-NEXT: r1 = udiv arg1 4 64
 ; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = mul arg3 8 64
+; CHECK-NEXT: r1 = mul arg3 16 64
 ; CHECK-NEXT: store 8 r1 sp 8
 ; CHECK-NEXT: r1 = udiv arg2 8 64
 ; CHECK-NEXT: store 8 r1 sp 16
@@ -32,9 +33,7 @@ define i32 @doShift(i64 %x, i64 %y, i64 %z) #0 {
 ; CHECK-NEXT: r1 = and r1 4294967295 64
 ; CHECK-NEXT: store 8 r1 sp 56
 ; CHECK-NEXT: r1 = load 8 sp 56
-; CHECK: ret r1
-
-entry:
+; CHECK-NEXT: ret r1
   %shr = lshr i64 %x, 2
   %shl = shl i64 %z, 4
   %shr1 = lshr i64 %y, 3
@@ -57,6 +56,26 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 define i32 @main() #0 {
 ; CHECK: start main 0:
 entry:
+; CHECK: sp = sub sp 40 64
+; CHECK-NEXT: r1 = call read
+; CHECK-NEXT: store 8 r1 sp 0
+; CHECK-NEXT: r1 = call read
+; CHECK-NEXT: store 8 r1 sp 8
+; CHECK-NEXT: r1 = call read
+; CHECK-NEXT: store 8 r1 sp 16
+; CHECK-NEXT: r1 = load 8 sp 0
+; CHECK-NEXT: r2 = load 8 sp 8
+; CHECK-NEXT: r3 = load 8 sp 16
+; CHECK-NEXT: r1 = call doShift r1 r2 r3
+; CHECK-NEXT: store 8 r1 sp 24
+; CHECK-NEXT: r1 = load 8 sp 24
+; CHECK-NEXT: r2 = and r1 2147483648 64
+; CHECK-NEXT: r2 = sub 0 r2 64
+; CHECK-NEXT: r1 = or r2 r1 64
+; CHECK-NEXT: store 8 r1 sp 32
+; CHECK-NEXT: r1 = load 8 sp 32
+; CHECK-NEXT: call write r1
+; CHECK-NEXT: ret 0
   %call = call i64 (...) @read()
   %call1 = call i64 (...) @read()
   %call2 = call i64 (...) @read()
