@@ -10,12 +10,6 @@
 #include <string>
 #include <sstream>
 #include <memory>
-#include <algorithm>
-#include <iterator>
-#include <map>
-#include <vector>
-
-#define TEMP_REGS 8
 
 using namespace llvm;
 using namespace std;
@@ -47,13 +41,17 @@ private:
   BasicBlock *BBToEmit = nullptr;
   unique_ptr<IRBuilder<TargetFolder>> Builder;
   Function *MallocFn = nullptr;
+  Instruction *DummyInst;
+  unsigned TempRegCnt;
 
   map<Function *, Function *> FuncMap;
   map<GlobalVariable *, Constant *> GVMap; // Global var to 'inttoptr i'
   vector<pair<uint64_t, uint64_t>> GVLocs; // (Global var addr, size) info
   map<Argument *, Argument *> ArgMap;
   map<BasicBlock *, BasicBlock *> BBMap;
+  vector<BasicBlock *> BasicBlockBFS;      // BFS-Ordered Basic Blocks
   map<Instruction *, Value *> InstMap;
+  map<Value *, AllocaInst *> ValToAllocaMap;
   map<Instruction *, unsigned> RegToRegMap;
   map<Instruction *, AllocaInst *> RegToAllocaMap;
   vector<pair<Instruction *, pair<Value *, unsigned>>> TempRegUsers;
@@ -94,37 +92,34 @@ private:
   }
 
 
+  string assemblyRegisterName(unsigned registerId) {
+    assert(1 <= registerId && registerId <= 16);
+    return "__r" + to_string(registerId) + "__";
+  }
   string retrieveAssemblyRegister(Instruction *I) {
     unsigned registerId;
     if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
-      for (unsigned i = 0; i < TEMP_REGS; i++) {
-        if (TempRegUsers[i].first == nullptr) {
-          TempRegUsers[i].first = I;
-          TempRegUsers[i].second.first = nullptr;
-          return "__r" + to_string(TempRegUsers[i].second.second) + "__";
-        }
+      for (unsigned i = 0; i < TempRegCnt; i++) {
+        if (TempRegUsers[i].first != nullptr) continue;
+        TempRegUsers[i].first = I;
+        TempRegUsers[i].second.first = nullptr;
+        return assemblyRegisterName(TempRegUsers[i].second.second);
       }
       emitStoreToSrcRegister(TempRegUsers[0].second.first, TempRegUsers[0].first);
       registerId = TempRegUsers[0].second.second;
       TempRegUsers.erase(TempRegUsers.begin());
       TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
-    } else
-      registerId = RegToRegMap[I];
+    } else registerId = RegToRegMap[I];
     assert(1 <= registerId && registerId <= 16);
-    return "__r" + to_string(registerId) + "__";
+    return assemblyRegisterName(registerId);
   }
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId) {
     assert(RegToAllocaMap.count(I));
-    assert(1 <= targetRegisterId && targetRegisterId <= TEMP_REGS &&
-           "register ID out of bounds for temporary storage!");
-    for (unsigned i = 0; i < TEMP_REGS; i++) {
-      if (TempRegUsers[i].first == I) {
-        assert(TempRegUsers[i].second.first != nullptr);
-        return TempRegUsers[i].second.first;
-      }
-    }
-    string RegName = retrieveAssemblyRegister(I);
-    auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], RegName);
+    assert(1 <= targetRegisterId && targetRegisterId <= 16 &&
+           "r1 ~ r16 are available only!");
+    for (unsigned i = 0; i < TempRegCnt; i++)
+      if (TempRegUsers[i].first == I) return TempRegUsers[i].second.first;
+    auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], retrieveAssemblyRegister(I));
     checkTgtType(TgtVal->getType());
     saveTempInst(I, TgtVal);
     return TgtVal;
@@ -139,14 +134,34 @@ private:
   }
   void saveInst(Value *Res, Instruction *I) {
     InstMap[I] = Res;
+    if (RegToAllocaMap.count(I)) ValToAllocaMap[Res] = RegToAllocaMap[I];
     saveTempInst(I, Res);
+    evictTempInst(DummyInst);
   }
   void saveTempInst(Instruction *OldI, Value *Res) {
-    for (unsigned i = 0; i < TEMP_REGS; i++) {
-      if (TempRegUsers[i].first == OldI) {
+    for (unsigned i = 0; i < TempRegCnt; i++)
+      if (TempRegUsers[i].first == OldI)
         TempRegUsers[i].second.first = Res;
-        return;
-      }
+  }
+  void evictTempInst(Instruction *I) {
+    for (unsigned i = 0; i < TempRegCnt; i++) {
+      if (TempRegUsers[i].first != I) continue;
+      unsigned registerId = TempRegUsers[i].second.second;
+      TempRegUsers.erase(TempRegUsers.begin() + i);
+      TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, registerId)));
+    }
+  }
+  void getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS) {
+    BasicBlockBFS.clear();
+    vector<BasicBlock *> BlockQueue;
+    BlockQueue.push_back(StartBB);
+    while (!BlockQueue.empty()) {
+      BasicBlock *BB = BlockQueue.front();
+      BlockQueue.erase(BlockQueue.begin());
+      if (find(BasicBlockBFS.begin(), BasicBlockBFS.end(), BB) != BasicBlockBFS.end()) continue;
+      BasicBlockBFS.push_back(BB);
+      for (unsigned i = 0, cnt = BB->getTerminator()->getNumSuccessors(); i < cnt; i++)
+        BlockQueue.push_back(BB->getTerminator()->getSuccessor(i));
     }
   }
 
@@ -157,6 +172,7 @@ private:
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId) {
     checkSrcType(V->getType());
 
+    if (auto *ZI = dyn_cast<ZExtInst>(V)) V = ZI->getOperand(0);
     if (auto *A = dyn_cast<Argument>(V)) {
       // Nothing to emit.
       // Returns one of "arg1", "arg2", ...
@@ -177,10 +193,11 @@ private:
       return GVMap[GV];
 
     } else if (auto *I = dyn_cast<Instruction>(V)) {
-      if (RegToAllocaMap.count(I) || !RegToRegMap.count(I))
-        return emitLoadFromSrcRegister(I, OperandId);
-      else
-        return InstMap[I];
+      if (RegToAllocaMap.count(I) || !RegToRegMap.count(I)) {
+        auto *Res = emitLoadFromSrcRegister(I, OperandId);
+        if (dyn_cast<PHINode>(I)) ValToAllocaMap[Res] = RegToAllocaMap[I];
+        return Res;
+      } else return InstMap[I];
 
     } else {
       assert(false && "Unknown instruction type!");
@@ -198,6 +215,7 @@ public:
     I1Ty = IntegerType::getInt1Ty(*Context);
     I8PtrTy = PointerType::getInt8PtrTy(*Context);
     ModuleToEmit->setDataLayout(M.getDataLayout());
+    DummyInst = CastInst::Create(CastInst::ZExt, ConstantInt::get(I64Ty, 0), I64Ty);
 
     uint64_t GVOffset = 20480;
     FunctionType *MallocTy = nullptr;
@@ -246,6 +264,7 @@ public:
       MallocFn = Function::Create(MallocTy, Function::ExternalLinkage,
                                   "malloc", *ModuleToEmit);
     }
+    for (Function &F : M) visitFunction(F);
   }
 
   void visitFunction(Function &F) {
@@ -260,10 +279,63 @@ public:
       ArgMap[F.getArg(i)] = Arg;
     }
 
-    // Fill source BB -> target BB map.
-    for (auto &BB : F) {
-      BBMap[&BB] = BasicBlock::Create(*Context, "." + BB.getName(), FuncToEmit);
+    if (F.getInstructionCount() <= 0) return;
+    TempRegCnt = 3;
+    unsigned instCnt = 0;
+    for (auto &BB: F) {
+      for (auto &I: BB) {
+        if (auto *CI = dyn_cast<CallInst>(&I)) {
+          unsigned argCnt = 0;
+          for (auto I = CI->arg_begin(), E = CI->arg_end(); I != E; ++I) argCnt++;
+          if (argCnt > TempRegCnt) TempRegCnt = argCnt;
+        }
+        if (I.hasName()) instCnt++;
+      }
     }
+    if ((instCnt <= 13) && (TempRegCnt <= 16 - instCnt)) TempRegCnt = 16 - instCnt;
+    if (TempRegCnt < 8) TempRegCnt = 8;
+    TempRegUsers.clear();
+    for (unsigned i = 0; i < TempRegCnt; i++) 
+      TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
+    getBlockBFS(&F.getEntryBlock(), BasicBlockBFS);
+    // Fill source BB -> target BB map.
+    for (auto *BB : BasicBlockBFS) BBMap[BB] = BasicBlock::Create(*Context, "." + BB->getName(), FuncToEmit);
+    for (auto *BB : BasicBlockBFS) visit(*BB); // Visit all basic blocks in this function
+    vector <pair<Instruction *, pair<Instruction *, Instruction *>>> LoadToAdd;
+    vector<pair<Instruction *, Instruction *>> StoreToAdd;
+    for (auto *BB : BasicBlockBFS) {
+      for (auto &I: *BBMap[BB]) {
+        if (auto *SI = dyn_cast<StoreInst>(&I)) {
+          auto *Op = SI->getValueOperand();
+          auto *OpI = dyn_cast<Instruction>(Op);
+          if (!SI->getPointerOperand()->getName().endswith("_slot") || !OpI) continue;
+          unsigned isStored = 0;
+          for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr) {
+            Instruction *UsrI = dyn_cast<Instruction>((*itr).getUser());
+            if (!UsrI || UsrI == SI) continue;
+            vector<BasicBlock *> Reachables;
+            getBlockBFS(SI->getParent(), Reachables);
+            for (BasicBlock *Reachable : Reachables) {
+              if (Reachable != UsrI->getParent()) continue;
+              for (auto &UserBBInst : *Reachable) {
+                Instruction *PtyOp = ValToAllocaMap[Op];
+                if (&UserBBInst == OpI) break;
+                if (&UserBBInst != UsrI || !PtyOp) continue;
+                if (!isStored && !dyn_cast<LoadInst>(OpI)) {
+                  StoreToAdd.push_back(make_pair(OpI, PtyOp));
+                  isStored = 1;
+                }
+                LoadToAdd.push_back(make_pair(PtyOp, make_pair(OpI, UsrI)));
+                break;
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+    for (auto entry : StoreToAdd) (new StoreInst(entry.first, entry.second))->insertAfter(entry.first);
+    for (auto entry: LoadToAdd) (new LoadInst(entry.first, entry.second.first->getName()))->insertBefore(entry.second.second);
   }
 
   void visitBasicBlock(BasicBlock &BB) {
@@ -272,33 +344,26 @@ public:
 
     Function *SourceFunc = BB.getParent();
     if (&BB == &SourceFunc->getEntryBlock()) {
-      TempRegUsers.clear();
-      for (unsigned i = 0; i < TEMP_REGS; i++) 
-        TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
-
+      // Let's create an alloca for each register..!
       vector<pair<unsigned, Instruction *>> InstCount; // sort by number of usages
-      for (auto I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc); I != E; ++I) {
-        if (!I->hasName() || dyn_cast<ZExtInst>(&*I) || dyn_cast<PHINode>(&*I))
-          continue;
-        auto SingleInstCount = make_pair(0, &*I);
-        for (auto itr = (*I).use_begin(), end = (*I).use_end(); itr != end; ++itr) {
-            if (dyn_cast<Instruction>((*itr).getUser())) // an instruction instance
-              SingleInstCount.first++;
+      for (auto *BB : BasicBlockBFS) {
+        for (auto &I : *BB) {
+          if (!I.hasName() || dyn_cast<ZExtInst>(&I) || dyn_cast<PHINode>(&I)) continue;
+          auto SingleInstCount = make_pair(0, &I);
+          for (auto itr = (I).use_begin(), end = (I).use_end(); itr != end; ++itr)
+              if (dyn_cast<Instruction>((*itr).getUser())) SingleInstCount.first++;
+          InstCount.push_back(SingleInstCount);
         }
-        InstCount.push_back(SingleInstCount);
       }
       sort(InstCount.begin(), InstCount.end()); 
       reverse(InstCount.begin(), InstCount.end()); // descending order
-      
-      // either create alloca, or use register
-      for (unsigned i = 0, sz = InstCount.size(); i < 16 - TEMP_REGS && i < sz; i++)
-        RegToRegMap[InstCount[i].second] = i + TEMP_REGS + 1; // r(T+1) ~ r16
-      
-      // either create alloca, or use register
-      IRBuilder<> IB(BBToEmit); 
-      for (inst_iterator I = inst_begin(*SourceFunc), E = inst_end(*SourceFunc);
-           I != E; ++I) {
-        if (I->hasName()) {
+      for (unsigned i = 0, sz = InstCount.size(); i < 16 - TempRegCnt && i < sz; i++)
+        RegToRegMap[InstCount[i].second] = i + TempRegCnt + 1; // r(T+1) ~ r16
+      IRBuilder<> IB(BBToEmit);
+      for (auto *BB : BasicBlockBFS) {
+        for (auto &RI : *BB) {
+          auto *I = &RI;
+          if (!I->hasName() || dyn_cast<ZExtInst>(I)) continue;
           auto *Ty = I->getType();
           checkSrcType(Ty);
           if (RegToRegMap.count(&*I))
@@ -406,7 +471,7 @@ public:
     auto *Op1 = translateSrcOperandToTgt(BO.getOperand(0), 1);
     auto *Op2 = translateSrcOperandToTgt(BO.getOperand(1), 2);
     auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, Ty,
-        retrieveAssemblyRegister(nullptr) + "after_trunc__");
+        retrieveAssemblyRegister(DummyInst) + "after_trunc__");
     auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, Ty,
         retrieveAssemblyRegister(nullptr) + "after_trunc__");
 
@@ -430,7 +495,7 @@ public:
     auto *Op1 = translateSrcOperandToTgt(II.getOperand(0), 1);
     auto *Op2 = translateSrcOperandToTgt(II.getOperand(1), 2);
     auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, OpTy,
-        retrieveAssemblyRegister(nullptr) + "after_trunc__");
+        retrieveAssemblyRegister(DummyInst) + "after_trunc__");
     auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, OpTy,
         retrieveAssemblyRegister(nullptr) + "after_trunc__");
 
@@ -447,13 +512,11 @@ public:
     auto *OpCond = translateSrcOperandToTgt(SI.getOperand(0), 1);
     assert(OpCond->getType() == I64Ty);
     // i64 -> i1 trunc
-    string R1Trunc = retrieveAssemblyRegister(nullptr)
-                                                         + "after_trunc__";
+    string R1Trunc = retrieveAssemblyRegister(nullptr) + "after_trunc__";
     OpCond = Builder->CreateTrunc(OpCond, I1Ty, R1Trunc);
 
     auto *OpLeft = translateSrcOperandToTgt(SI.getOperand(1), 2);
     auto *OpRight = translateSrcOperandToTgt(SI.getOperand(2), 3);
-    
     auto *Res = Builder->CreateSelect(OpCond, OpLeft, OpRight, 
                     retrieveAssemblyRegister(&SI));
     saveInst(Res, &SI);
@@ -462,7 +525,7 @@ public:
     // Make it look like 'gep i8* ptr, i'
     auto *PtrOp = translateSrcOperandToTgt(GEPI.getPointerOperand(), 1);
     auto *PtrI8Op = Builder->CreateBitCast(PtrOp, I8PtrTy,
-                        retrieveAssemblyRegister(nullptr));
+                                retrieveAssemblyRegister(DummyInst));
     unsigned Idx = 1;
     Type *CurrentPtrTy = GEPI.getPointerOperandType();
 
@@ -483,9 +546,10 @@ public:
       if (auto *CI = dyn_cast<ConstantInt>(IdxValue))
         isZero = CI->getZExtValue() == 0;
 
-      if (!isZero)
-        PtrI8Op = Builder->CreateGEP(PtrI8Op, IdxValue, 
-                            retrieveAssemblyRegister(nullptr));
+      if (!isZero) {
+        evictTempInst(DummyInst);
+        PtrI8Op = Builder->CreateGEP(PtrI8Op, IdxValue, retrieveAssemblyRegister(DummyInst));
+      }
 
       if (!ElemTy->isArrayTy()) {
         CurrentPtrTy = nullptr;
@@ -512,8 +576,7 @@ public:
     uint64_t bw = SI.getOperand(0)->getType()->getIntegerBitWidth();
     auto *Op = translateSrcOperandToTgt(SI.getOperand(0), 1);
     auto *AndVal =
-      Builder->CreateAnd(Op, (1llu << (bw - 1)), 
-                         retrieveAssemblyRegister(nullptr));
+      Builder->CreateAnd(Op, (1llu << (bw - 1)), retrieveAssemblyRegister(nullptr));
     auto *NegVal =
       Builder->CreateSub(ConstantInt::get(I64Ty, 0), AndVal,
                          retrieveAssemblyRegister(nullptr));
@@ -527,20 +590,17 @@ public:
   void visitTruncInst(TruncInst &TI) {
     auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
     uint64_t Mask = (1llu << (TI.getDestTy()->getIntegerBitWidth())) - 1;
-    auto *Res = Builder->CreateAnd(Op, Mask, 
-                          retrieveAssemblyRegister(&TI));
+    auto *Res = Builder->CreateAnd(Op, Mask, retrieveAssemblyRegister(&TI));
     saveInst(Res, &TI);
   }
   void visitPtrToIntInst(PtrToIntInst &PI) {
     auto *Op = translateSrcOperandToTgt(PI.getOperand(0), 1);
-    auto *Res = Builder->CreatePtrToInt(Op, I64Ty, 
-                          retrieveAssemblyRegister(&PI));
+    auto *Res = Builder->CreatePtrToInt(Op, I64Ty, retrieveAssemblyRegister(&PI));
     saveInst(Res, &PI);
   }
   void visitIntToPtrInst(IntToPtrInst &II) {
     auto *Op = translateSrcOperandToTgt(II.getOperand(0), 1);
-    auto *Res = Builder->CreateIntToPtr(Op, II.getType(),
-                            retrieveAssemblyRegister(&II));
+    auto *Res = Builder->CreateIntToPtr(Op, II.getType(), retrieveAssemblyRegister(&II));
     saveInst(Res, &II);
   }
 
@@ -626,6 +686,7 @@ public:
     //   store x, y_phi_tmp_slot
     //   store (load x_phi_tmp_slot), x_slot
     //   store (load y_phi_tmp_slot), y_slot
+    vector<PHINode *> StoreToMake;
     for (auto &PHI : Succ->phis()) {
       auto *V =
         translateSrcOperandToTgt(PHI.getIncomingValueForBlock(BBFrom), 1);
@@ -633,8 +694,11 @@ public:
       assert(!isa<Instruction>(V) || !V->hasName() ||
              V->getName().startswith("__r"));
       assert(RegToAllocaMap.count(&PHI));
-      Builder->CreateStore(V, RegToAllocaMap[&PHI]);
+      StoreToMake.push_back(&PHI);
+      evictTempInst(&PHI);
     }
+    for (auto *PHI: StoreToMake)
+      Builder->CreateStore(translateSrcOperandToTgt(PHI->getIncomingValueForBlock(BBFrom), 1), RegToAllocaMap[PHI]);
   }
 
 
@@ -702,7 +766,7 @@ PreservedAnalyses SimpleBackend::run(Module &M, ModuleAnalysisManager &FAM) {
 
   // Third, depromote registers to alloca & canonicalize iN types into i64.
   DepromoteRegisters Deprom;
-  Deprom.visit(M);
+  Deprom.visitModule(M);
 
   if (verifyModule(M, &errs(), nullptr)) {
     errs() << "BUG: DepromoteRegisters created an ill-formed module!\n";
