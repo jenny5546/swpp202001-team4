@@ -1,478 +1,571 @@
 define i32 @main() #0 {
-; CHECK:   start main 0:
-; CHECK:     .entry:
-; CHECK-NEXT:       ; init sp!
-; CHECK-NEXT:       sp = sub sp 792 64
-; CHECK-NEXT:       r9 = call read
-; CHECK-NEXT:       store 8 0 sp 0
-; CHECK-NEXT:       store 8 0 sp 8
-; CHECK-NEXT:       store 8 0 sp 16
-; CHECK-NEXT:       store 8 0 sp 24
-; CHECK-NEXT:       store 8 0 sp 32
-; CHECK-NEXT:       store 8 0 sp 40
-; CHECK-NEXT:       store 8 0 sp 48
-; CHECK-NEXT:       store 8 0 sp 56
-; CHECK-NEXT:       store 8 0 sp 64
-; CHECK-NEXT:       store 8 0 sp 72
-; CHECK-NEXT:       store 8 0 sp 80
-; CHECK-NEXT:       store 8 0 sp 88
-; CHECK-NEXT:       store 8 0 sp 96
-; CHECK-NEXT:       store 8 0 sp 104
-; CHECK-NEXT:       store 8 0 sp 112
-; CHECK-NEXT:       store 8 0 sp 120
-; CHECK-NEXT:       store 8 0 sp 128
-; CHECK-NEXT:       store 8 0 sp 136
-; CHECK-NEXT:       store 8 0 sp 144
-; CHECK-NEXT:       store 8 0 sp 152
-; CHECK-NEXT:       store 8 0 sp 160
-; CHECK-NEXT:       store 8 0 sp 168
-; CHECK-NEXT:       store 8 0 sp 176
-; CHECK-NEXT:       store 8 0 sp 184
-; CHECK-NEXT:       store 8 0 sp 192
-; CHECK-NEXT:       store 8 0 sp 200
-; CHECK-NEXT:       store 8 0 sp 208
-; CHECK-NEXT:       store 8 0 sp 216
-; CHECK-NEXT:       store 8 0 sp 224
-; CHECK-NEXT:       store 8 0 sp 232
-; CHECK-NEXT:       store 8 0 sp 240
-; CHECK-NEXT:       store 8 0 sp 248
-; CHECK-NEXT:       store 8 0 sp 256
-; CHECK-NEXT:       store 8 0 sp 264
-; CHECK-NEXT:       store 8 0 sp 272
-; CHECK-NEXT:       store 8 0 sp 280
-; CHECK-NEXT:       store 8 0 sp 288
-; CHECK-NEXT:       store 8 0 sp 296
-; CHECK-NEXT:       store 8 0 sp 304
-; CHECK-NEXT:       store 8 0 sp 312
-; CHECK-NEXT:       store 8 0 sp 320
-; CHECK-NEXT:       store 8 0 sp 328
-; CHECK-NEXT:       store 8 0 sp 336
-; CHECK-NEXT:       store 8 0 sp 344
-; CHECK-NEXT:       store 8 0 sp 352
-; CHECK-NEXT:       store 8 0 sp 360
-; CHECK-NEXT:       store 8 0 sp 368
-; CHECK-NEXT:       store 8 0 sp 376
-; CHECK-NEXT:       store 8 0 sp 384
-; CHECK-NEXT:       store 8 0 sp 392
-; CHECK-NEXT:       store 8 0 sp 400
-; CHECK-NEXT:       br .for.cond
-; CHECK:     .for.cond:
-; CHECK-NEXT:       r1 = load 8 sp 400
-; CHECK-NEXT:       r2 = icmp sle r1 50 32
-; CHECK-NEXT:       br r2 .for.body .for.cond.cleanup
-; CHECK:     .for.cond.cleanup:
-; CHECK-NEXT:       br .for.end
-; CHECK:     .for.body:
-; CHECK-NEXT:       r3 = add r9 0 64
-; CHECK-NEXT:       r4 = add r9 1 64
-; CHECK-NEXT:       r5 = add r9 2 64
-; CHECK-NEXT:       r6 = add r9 3 64
-; CHECK-NEXT:       r7 = add r9 4 64
-; CHECK-NEXT:       r8 = add r9 5 64
-; CHECK-NEXT:       store 8 r1 sp 400
-; CHECK-NEXT:       r1 = add r9 6 64
-; CHECK-NEXT:       store 8 r2 sp 408
-; CHECK-NEXT:       r2 = add r9 7 64
-; CHECK-NEXT:       store 8 r3 sp 416
-; CHECK-NEXT:       r3 = add r9 8 64
-; CHECK-NEXT:       store 8 r4 sp 424
-; CHECK-NEXT:       r4 = add r9 9 64
-; CHECK-NEXT:       store 8 r5 sp 432
-; CHECK-NEXT:       r5 = add r9 10 64
-; CHECK-NEXT:       store 8 r6 sp 440
-; CHECK-NEXT:       r6 = add r9 11 64
-; CHECK-NEXT:       store 8 r7 sp 448
-; CHECK-NEXT:       r7 = add r9 12 64
-; CHECK-NEXT:       store 8 r8 sp 456
-; CHECK-NEXT:       r8 = add r9 13 64
-; CHECK-NEXT:       store 8 r1 sp 464
-; CHECK-NEXT:       r1 = add r9 14 64
-; CHECK-NEXT:       store 8 r2 sp 472
-; CHECK-NEXT:       r2 = add r9 15 64
-; CHECK-NEXT:       store 8 r3 sp 480
-; CHECK-NEXT:       r3 = add r9 16 64
-; CHECK-NEXT:       store 8 r4 sp 488
-; CHECK-NEXT:       r4 = add r9 17 64
-; CHECK-NEXT:       store 8 r5 sp 496
-; CHECK-NEXT:       r5 = add r9 18 64
-; CHECK-NEXT:       store 8 r6 sp 504
-; CHECK-NEXT:       r6 = add r9 19 64
-; CHECK-NEXT:       store 8 r7 sp 512
-; CHECK-NEXT:       r7 = add r9 20 64
-; CHECK-NEXT:       store 8 r8 sp 520
-; CHECK-NEXT:       r8 = add r9 21 64
-; CHECK-NEXT:       store 8 r1 sp 528
-; CHECK-NEXT:       r1 = add r9 22 64
-; CHECK-NEXT:       store 8 r2 sp 536
-; CHECK-NEXT:       r2 = add r9 23 64
-; CHECK-NEXT:       store 8 r3 sp 544
-; CHECK-NEXT:       r3 = add r9 24 64
-; CHECK-NEXT:       store 8 r4 sp 552
-; CHECK-NEXT:       r4 = add r9 25 64
-; CHECK-NEXT:       store 8 r5 sp 560
-; CHECK-NEXT:       r5 = add r9 26 64
-; CHECK-NEXT:       store 8 r6 sp 568
-; CHECK-NEXT:       r6 = add r9 27 64
-; CHECK-NEXT:       store 8 r7 sp 576
-; CHECK-NEXT:       r7 = add r9 28 64
-; CHECK-NEXT:       store 8 r8 sp 584
-; CHECK-NEXT:       r8 = add r9 29 64
-; CHECK-NEXT:       store 8 r1 sp 592
-; CHECK-NEXT:       r1 = add r9 30 64
-; CHECK-NEXT:       store 8 r2 sp 600
-; CHECK-NEXT:       r2 = add r9 31 64
-; CHECK-NEXT:       store 8 r3 sp 608
-; CHECK-NEXT:       r3 = add r9 32 64
-; CHECK-NEXT:       store 8 r4 sp 616
-; CHECK-NEXT:       r4 = add r9 33 64
-; CHECK-NEXT:       store 8 r5 sp 624
-; CHECK-NEXT:       r5 = add r9 34 64
-; CHECK-NEXT:       store 8 r6 sp 632
-; CHECK-NEXT:       r6 = add r9 35 64
-; CHECK-NEXT:       store 8 r7 sp 640
-; CHECK-NEXT:       r7 = add r9 36 64
-; CHECK-NEXT:       store 8 r8 sp 648
-; CHECK-NEXT:       r8 = add r9 37 64
-; CHECK-NEXT:       store 8 r1 sp 656
-; CHECK-NEXT:       r1 = add r9 38 64
-; CHECK-NEXT:       store 8 r2 sp 664
-; CHECK-NEXT:       r2 = add r9 39 64
-; CHECK-NEXT:       store 8 r3 sp 672
-; CHECK-NEXT:       r3 = add r9 40 64
-; CHECK-NEXT:       store 8 r4 sp 680
-; CHECK-NEXT:       r4 = add r9 41 64
-; CHECK-NEXT:       store 8 r5 sp 688
-; CHECK-NEXT:       r5 = add r9 42 64
-; CHECK-NEXT:       store 8 r6 sp 696
-; CHECK-NEXT:       r6 = add r9 43 64
-; CHECK-NEXT:       store 8 r7 sp 704
-; CHECK-NEXT:       r7 = add r9 44 64
-; CHECK-NEXT:       store 8 r8 sp 712
-; CHECK-NEXT:       r8 = add r9 45 64
-; CHECK-NEXT:       store 8 r1 sp 720
-; CHECK-NEXT:       r16 = add r9 46 64
-; CHECK-NEXT:       r15 = add r9 47 64
-; CHECK-NEXT:       r14 = add r9 48 64
-; CHECK-NEXT:       r13 = add r9 49 64
-; CHECK-NEXT:       br .for.inc
-; CHECK:     .for.inc:
-; CHECK-NEXT:       r1 = load 8 sp 400
-; CHECK-NEXT:       store 8 r2 sp 728
-; CHECK-NEXT:       r12 = add r1 1 32
-; CHECK-NEXT:       r2 = load 8 sp 416
-; CHECK-NEXT:       store 8 r2 sp 0
-; CHECK-NEXT:       store 8 r3 sp 736
-; CHECK-NEXT:       r3 = load 8 sp 424
-; CHECK-NEXT:       store 8 r3 sp 8
-; CHECK-NEXT:       store 8 r4 sp 744
-; CHECK-NEXT:       r4 = load 8 sp 432
-; CHECK-NEXT:       store 8 r4 sp 16
-; CHECK-NEXT:       store 8 r5 sp 752
-; CHECK-NEXT:       r5 = load 8 sp 440
-; CHECK-NEXT:       store 8 r5 sp 24
-; CHECK-NEXT:       store 8 r6 sp 760
-; CHECK-NEXT:       r6 = load 8 sp 448
-; CHECK-NEXT:       store 8 r6 sp 32
-; CHECK-NEXT:       store 8 r7 sp 768
-; CHECK-NEXT:       r7 = load 8 sp 456
-; CHECK-NEXT:       store 8 r7 sp 40
-; CHECK-NEXT:       store 8 r8 sp 776
-; CHECK-NEXT:       r8 = load 8 sp 464
-; CHECK-NEXT:       store 8 r8 sp 48
-; CHECK-NEXT:       store 8 r1 sp 400
-; CHECK-NEXT:       r1 = load 8 sp 472
-; CHECK-NEXT:       store 8 r1 sp 56
-; CHECK-NEXT:       store 8 r2 sp 416
-; CHECK-NEXT:       r2 = load 8 sp 480
-; CHECK-NEXT:       store 8 r2 sp 64
-; CHECK-NEXT:       store 8 r3 sp 424
-; CHECK-NEXT:       r3 = load 8 sp 488
-; CHECK-NEXT:       store 8 r3 sp 72
-; CHECK-NEXT:       store 8 r4 sp 432
-; CHECK-NEXT:       r4 = load 8 sp 496
-; CHECK-NEXT:       store 8 r4 sp 80
-; CHECK-NEXT:       store 8 r5 sp 440
-; CHECK-NEXT:       r5 = load 8 sp 504
-; CHECK-NEXT:       store 8 r5 sp 88
-; CHECK-NEXT:       store 8 r6 sp 448
-; CHECK-NEXT:       r6 = load 8 sp 512
-; CHECK-NEXT:       store 8 r6 sp 96
-; CHECK-NEXT:       store 8 r7 sp 456
-; CHECK-NEXT:       r7 = load 8 sp 520
-; CHECK-NEXT:       store 8 r7 sp 104
-; CHECK-NEXT:       store 8 r8 sp 464
-; CHECK-NEXT:       r8 = load 8 sp 528
-; CHECK-NEXT:       store 8 r8 sp 112
-; CHECK-NEXT:       store 8 r1 sp 472
-; CHECK-NEXT:       r1 = load 8 sp 536
-; CHECK-NEXT:       store 8 r1 sp 120
-; CHECK-NEXT:       store 8 r2 sp 480
-; CHECK-NEXT:       r2 = load 8 sp 544
-; CHECK-NEXT:       store 8 r2 sp 128
-; CHECK-NEXT:       store 8 r3 sp 488
-; CHECK-NEXT:       r3 = load 8 sp 552
-; CHECK-NEXT:       store 8 r3 sp 136
-; CHECK-NEXT:       store 8 r4 sp 496
-; CHECK-NEXT:       r4 = load 8 sp 560
-; CHECK-NEXT:       store 8 r4 sp 144
-; CHECK-NEXT:       store 8 r5 sp 504
-; CHECK-NEXT:       r5 = load 8 sp 568
-; CHECK-NEXT:       store 8 r5 sp 152
-; CHECK-NEXT:       store 8 r6 sp 512
-; CHECK-NEXT:       r6 = load 8 sp 576
-; CHECK-NEXT:       store 8 r6 sp 160
-; CHECK-NEXT:       store 8 r7 sp 520
-; CHECK-NEXT:       r7 = load 8 sp 584
-; CHECK-NEXT:       store 8 r7 sp 168
-; CHECK-NEXT:       store 8 r8 sp 528
-; CHECK-NEXT:       r8 = load 8 sp 592
-; CHECK-NEXT:       store 8 r8 sp 176
-; CHECK-NEXT:       store 8 r1 sp 536
-; CHECK-NEXT:       r1 = load 8 sp 600
-; CHECK-NEXT:       store 8 r1 sp 184
-; CHECK-NEXT:       store 8 r2 sp 544
-; CHECK-NEXT:       r2 = load 8 sp 608
-; CHECK-NEXT:       store 8 r2 sp 192
-; CHECK-NEXT:       store 8 r3 sp 552
-; CHECK-NEXT:       r3 = load 8 sp 616
-; CHECK-NEXT:       store 8 r3 sp 200
-; CHECK-NEXT:       store 8 r4 sp 560
-; CHECK-NEXT:       r4 = load 8 sp 624
-; CHECK-NEXT:       store 8 r4 sp 208
-; CHECK-NEXT:       store 8 r5 sp 568
-; CHECK-NEXT:       r5 = load 8 sp 632
-; CHECK-NEXT:       store 8 r5 sp 216
-; CHECK-NEXT:       store 8 r6 sp 576
-; CHECK-NEXT:       r6 = load 8 sp 640
-; CHECK-NEXT:       store 8 r6 sp 224
-; CHECK-NEXT:       store 8 r7 sp 584
-; CHECK-NEXT:       r7 = load 8 sp 648
-; CHECK-NEXT:       store 8 r7 sp 232
-; CHECK-NEXT:       store 8 r8 sp 592
-; CHECK-NEXT:       r8 = load 8 sp 656
-; CHECK-NEXT:       store 8 r8 sp 240
-; CHECK-NEXT:       store 8 r1 sp 600
-; CHECK-NEXT:       r1 = load 8 sp 664
-; CHECK-NEXT:       store 8 r1 sp 248
-; CHECK-NEXT:       store 8 r2 sp 608
-; CHECK-NEXT:       r2 = load 8 sp 672
-; CHECK-NEXT:       store 8 r2 sp 256
-; CHECK-NEXT:       store 8 r3 sp 616
-; CHECK-NEXT:       r3 = load 8 sp 680
-; CHECK-NEXT:       store 8 r3 sp 264
-; CHECK-NEXT:       store 8 r4 sp 624
-; CHECK-NEXT:       r4 = load 8 sp 688
-; CHECK-NEXT:       store 8 r4 sp 272
-; CHECK-NEXT:       store 8 r5 sp 632
-; CHECK-NEXT:       r5 = load 8 sp 696
-; CHECK-NEXT:       store 8 r5 sp 280
-; CHECK-NEXT:       store 8 r6 sp 640
-; CHECK-NEXT:       r6 = load 8 sp 704
-; CHECK-NEXT:       store 8 r6 sp 288
-; CHECK-NEXT:       store 8 r7 sp 648
-; CHECK-NEXT:       r7 = load 8 sp 712
-; CHECK-NEXT:       store 8 r7 sp 296
-; CHECK-NEXT:       store 8 r8 sp 656
-; CHECK-NEXT:       r8 = load 8 sp 720
-; CHECK-NEXT:       store 8 r8 sp 304
-; CHECK-NEXT:       store 8 r1 sp 664
-; CHECK-NEXT:       r1 = load 8 sp 728
-; CHECK-NEXT:       store 8 r1 sp 312
-; CHECK-NEXT:       store 8 r2 sp 672
-; CHECK-NEXT:       r2 = load 8 sp 736
-; CHECK-NEXT:       store 8 r2 sp 320
-; CHECK-NEXT:       store 8 r3 sp 680
-; CHECK-NEXT:       r3 = load 8 sp 744
-; CHECK-NEXT:       store 8 r3 sp 328
-; CHECK-NEXT:       store 8 r4 sp 688
-; CHECK-NEXT:       r4 = load 8 sp 752
-; CHECK-NEXT:       store 8 r4 sp 336
-; CHECK-NEXT:       store 8 r5 sp 696
-; CHECK-NEXT:       r5 = load 8 sp 760
-; CHECK-NEXT:       store 8 r5 sp 344
-; CHECK-NEXT:       store 8 r6 sp 704
-; CHECK-NEXT:       r6 = load 8 sp 768
-; CHECK-NEXT:       store 8 r6 sp 352
-; CHECK-NEXT:       store 8 r7 sp 712
-; CHECK-NEXT:       r7 = load 8 sp 776
-; CHECK-NEXT:       store 8 r7 sp 360
-; CHECK-NEXT:       store 8 r16 sp 368
-; CHECK-NEXT:       store 8 r15 sp 376
-; CHECK-NEXT:       store 8 r14 sp 384
-; CHECK-NEXT:       store 8 r13 sp 392
-; CHECK-NEXT:       store 8 r12 sp 400
-; CHECK-NEXT:       br .for.cond
-; CHECK:     .for.end:
-; CHECK-NEXT:       store 8 0 sp 784
-; CHECK-NEXT:       br .for.cond51
-; CHECK:     .for.cond51:
-; CHECK-NEXT:       store 8 r8 sp 720
-; CHECK-NEXT:       r8 = load 8 sp 784
-; CHECK-NEXT:       store 8 r1 sp 728
-; CHECK-NEXT:       r11 = icmp sle r8 50 32
-; CHECK-NEXT:       br r11 .for.body54 .for.cond.cleanup53
-; CHECK:     .for.cond.cleanup53:
-; CHECK-NEXT:       br .for.end57
-; CHECK:     .for.body54:
-; CHECK-NEXT:       r1 = load 8 sp 0
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 736
-; CHECK-NEXT:       r2 = load 8 sp 8
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       store 8 r3 sp 744
-; CHECK-NEXT:       r3 = load 8 sp 16
-; CHECK-NEXT:       call write r3
-; CHECK-NEXT:       store 8 r4 sp 752
-; CHECK-NEXT:       r4 = load 8 sp 24
-; CHECK-NEXT:       call write r4
-; CHECK-NEXT:       store 8 r5 sp 760
-; CHECK-NEXT:       r5 = load 8 sp 32
-; CHECK-NEXT:       call write r5
-; CHECK-NEXT:       store 8 r6 sp 768
-; CHECK-NEXT:       r6 = load 8 sp 40
-; CHECK-NEXT:       call write r6
-; CHECK-NEXT:       store 8 r7 sp 776
-; CHECK-NEXT:       r7 = load 8 sp 48
-; CHECK-NEXT:       call write r7
-; CHECK-NEXT:       store 8 r8 sp 784
-; CHECK-NEXT:       r8 = load 8 sp 56
-; CHECK-NEXT:       call write r8
-; CHECK-NEXT:       store 8 r1 sp 0
-; CHECK-NEXT:       r1 = load 8 sp 64
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 8
-; CHECK-NEXT:       r2 = load 8 sp 72
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       store 8 r3 sp 16
-; CHECK-NEXT:       r3 = load 8 sp 80
-; CHECK-NEXT:       call write r3
-; CHECK-NEXT:       store 8 r4 sp 24
-; CHECK-NEXT:       r4 = load 8 sp 88
-; CHECK-NEXT:       call write r4
-; CHECK-NEXT:       store 8 r5 sp 32
-; CHECK-NEXT:       r5 = load 8 sp 96
-; CHECK-NEXT:       call write r5
-; CHECK-NEXT:       store 8 r6 sp 40
-; CHECK-NEXT:       r6 = load 8 sp 104
-; CHECK-NEXT:       call write r6
-; CHECK-NEXT:       store 8 r7 sp 48
-; CHECK-NEXT:       r7 = load 8 sp 112
-; CHECK-NEXT:       call write r7
-; CHECK-NEXT:       store 8 r8 sp 56
-; CHECK-NEXT:       r8 = load 8 sp 120
-; CHECK-NEXT:       call write r8
-; CHECK-NEXT:       store 8 r1 sp 64
-; CHECK-NEXT:       r1 = load 8 sp 128
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 72
-; CHECK-NEXT:       r2 = load 8 sp 136
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       store 8 r3 sp 80
-; CHECK-NEXT:       r3 = load 8 sp 144
-; CHECK-NEXT:       call write r3
-; CHECK-NEXT:       store 8 r4 sp 88
-; CHECK-NEXT:       r4 = load 8 sp 152
-; CHECK-NEXT:       call write r4
-; CHECK-NEXT:       store 8 r5 sp 96
-; CHECK-NEXT:       r5 = load 8 sp 160
-; CHECK-NEXT:       call write r5
-; CHECK-NEXT:       store 8 r6 sp 104
-; CHECK-NEXT:       r6 = load 8 sp 168
-; CHECK-NEXT:       call write r6
-; CHECK-NEXT:       store 8 r7 sp 112
-; CHECK-NEXT:       r7 = load 8 sp 176
-; CHECK-NEXT:       call write r7
-; CHECK-NEXT:       store 8 r8 sp 120
-; CHECK-NEXT:       r8 = load 8 sp 184
-; CHECK-NEXT:       call write r8
-; CHECK-NEXT:       store 8 r1 sp 128
-; CHECK-NEXT:       r1 = load 8 sp 192
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 136
-; CHECK-NEXT:       r2 = load 8 sp 200
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       store 8 r3 sp 144
-; CHECK-NEXT:       r3 = load 8 sp 208
-; CHECK-NEXT:       call write r3
-; CHECK-NEXT:       store 8 r4 sp 152
-; CHECK-NEXT:       r4 = load 8 sp 216
-; CHECK-NEXT:       call write r4
-; CHECK-NEXT:       store 8 r5 sp 160
-; CHECK-NEXT:       r5 = load 8 sp 224
-; CHECK-NEXT:       call write r5
-; CHECK-NEXT:       store 8 r6 sp 168
-; CHECK-NEXT:       r6 = load 8 sp 232
-; CHECK-NEXT:       call write r6
-; CHECK-NEXT:       store 8 r7 sp 176
-; CHECK-NEXT:       r7 = load 8 sp 240
-; CHECK-NEXT:       call write r7
-; CHECK-NEXT:       store 8 r8 sp 184
-; CHECK-NEXT:       r8 = load 8 sp 248
-; CHECK-NEXT:       call write r8
-; CHECK-NEXT:       store 8 r1 sp 192
-; CHECK-NEXT:       r1 = load 8 sp 256
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 200
-; CHECK-NEXT:       r2 = load 8 sp 264
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       store 8 r3 sp 208
-; CHECK-NEXT:       r3 = load 8 sp 272
-; CHECK-NEXT:       call write r3
-; CHECK-NEXT:       store 8 r4 sp 216
-; CHECK-NEXT:       r4 = load 8 sp 280
-; CHECK-NEXT:       call write r4
-; CHECK-NEXT:       store 8 r5 sp 224
-; CHECK-NEXT:       r5 = load 8 sp 288
-; CHECK-NEXT:       call write r5
-; CHECK-NEXT:       store 8 r6 sp 232
-; CHECK-NEXT:       r6 = load 8 sp 296
-; CHECK-NEXT:       call write r6
-; CHECK-NEXT:       store 8 r7 sp 240
-; CHECK-NEXT:       r7 = load 8 sp 304
-; CHECK-NEXT:       call write r7
-; CHECK-NEXT:       store 8 r8 sp 248
-; CHECK-NEXT:       r8 = load 8 sp 312
-; CHECK-NEXT:       call write r8
-; CHECK-NEXT:       store 8 r1 sp 256
-; CHECK-NEXT:       r1 = load 8 sp 320
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 264
-; CHECK-NEXT:       r2 = load 8 sp 328
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       store 8 r3 sp 272
-; CHECK-NEXT:       r3 = load 8 sp 336
-; CHECK-NEXT:       call write r3
-; CHECK-NEXT:       store 8 r4 sp 280
-; CHECK-NEXT:       r4 = load 8 sp 344
-; CHECK-NEXT:       call write r4
-; CHECK-NEXT:       store 8 r5 sp 288
-; CHECK-NEXT:       r5 = load 8 sp 352
-; CHECK-NEXT:       call write r5
-; CHECK-NEXT:       store 8 r6 sp 296
-; CHECK-NEXT:       r6 = load 8 sp 360
-; CHECK-NEXT:       call write r6
-; CHECK-NEXT:       store 8 r7 sp 304
-; CHECK-NEXT:       r7 = load 8 sp 368
-; CHECK-NEXT:       call write r7
-; CHECK-NEXT:       store 8 r8 sp 312
-; CHECK-NEXT:       r8 = load 8 sp 376
-; CHECK-NEXT:       call write r8
-; CHECK-NEXT:       store 8 r1 sp 320
-; CHECK-NEXT:       r1 = load 8 sp 384
-; CHECK-NEXT:       call write r1
-; CHECK-NEXT:       store 8 r2 sp 328
-; CHECK-NEXT:       r2 = load 8 sp 392
-; CHECK-NEXT:       call write r2
-; CHECK-NEXT:       br .for.inc55
-; CHECK:     .for.inc55:
-; CHECK-NEXT:       store 8 r3 sp 336
-; CHECK-NEXT:       r3 = load 8 sp 784
-; CHECK-NEXT:       store 8 r4 sp 344
-; CHECK-NEXT:       r10 = add r3 1 32
-; CHECK-NEXT:       store 8 r10 sp 784
-; CHECK-NEXT:       br .for.cond51
-; CHECK:     .for.end57:
-; CHECK-NEXT:       ret 0
+; CHECK: start main 0:
+; CHECK:   .entry:
+; CHECK-NEXT:     ; init sp!
+; CHECK-NEXT:     sp = sub sp 792 64
+; CHECK-NEXT:     r9 = call read
+; CHECK-NEXT:     store 8 0 sp 0
+; CHECK-NEXT:     store 8 0 sp 8
+; CHECK-NEXT:     store 8 0 sp 16
+; CHECK-NEXT:     store 8 0 sp 24
+; CHECK-NEXT:     store 8 0 sp 32
+; CHECK-NEXT:     store 8 0 sp 40
+; CHECK-NEXT:     store 8 0 sp 48
+; CHECK-NEXT:     store 8 0 sp 56
+; CHECK-NEXT:     store 8 0 sp 64
+; CHECK-NEXT:     store 8 0 sp 72
+; CHECK-NEXT:     store 8 0 sp 80
+; CHECK-NEXT:     store 8 0 sp 88
+; CHECK-NEXT:     store 8 0 sp 96
+; CHECK-NEXT:     store 8 0 sp 104
+; CHECK-NEXT:     store 8 0 sp 112
+; CHECK-NEXT:     store 8 0 sp 120
+; CHECK-NEXT:     store 8 0 sp 128
+; CHECK-NEXT:     store 8 0 sp 136
+; CHECK-NEXT:     store 8 0 sp 144
+; CHECK-NEXT:     store 8 0 sp 152
+; CHECK-NEXT:     store 8 0 sp 160
+; CHECK-NEXT:     store 8 0 sp 168
+; CHECK-NEXT:     store 8 0 sp 176
+; CHECK-NEXT:     store 8 0 sp 184
+; CHECK-NEXT:     store 8 0 sp 192
+; CHECK-NEXT:     store 8 0 sp 200
+; CHECK-NEXT:     store 8 0 sp 208
+; CHECK-NEXT:     store 8 0 sp 216
+; CHECK-NEXT:     store 8 0 sp 224
+; CHECK-NEXT:     store 8 0 sp 232
+; CHECK-NEXT:     store 8 0 sp 240
+; CHECK-NEXT:     store 8 0 sp 248
+; CHECK-NEXT:     store 8 0 sp 256
+; CHECK-NEXT:     store 8 0 sp 264
+; CHECK-NEXT:     store 8 0 sp 272
+; CHECK-NEXT:     store 8 0 sp 280
+; CHECK-NEXT:     store 8 0 sp 288
+; CHECK-NEXT:     store 8 0 sp 296
+; CHECK-NEXT:     store 8 0 sp 304
+; CHECK-NEXT:     store 8 0 sp 312
+; CHECK-NEXT:     store 8 0 sp 320
+; CHECK-NEXT:     store 8 0 sp 328
+; CHECK-NEXT:     store 8 0 sp 336
+; CHECK-NEXT:     store 8 0 sp 344
+; CHECK-NEXT:     store 8 0 sp 352
+; CHECK-NEXT:     store 8 0 sp 360
+; CHECK-NEXT:     store 8 0 sp 368
+; CHECK-NEXT:     store 8 0 sp 376
+; CHECK-NEXT:     store 8 0 sp 384
+; CHECK-NEXT:     store 8 0 sp 392
+; CHECK-NEXT:     store 8 0 sp 400
+; CHECK-NEXT:     br .for.cond
+; CHECK:   .for.cond:
+; CHECK-NEXT:     r1 = load 8 sp 400
+; CHECK-NEXT:     r3 = icmp sle r1 50 32
+; CHECK-NEXT:     br r3 .for.body .for.cond.cleanup
+; CHECK:   .for.body:
+; CHECK-NEXT:     r5 = add r9 0 64
+; CHECK-NEXT:     r7 = add r9 1 64
+; CHECK-NEXT:     r2 = add r9 2 64
+; CHECK-NEXT:     r6 = add r9 3 64
+; CHECK-NEXT:     r4 = add r9 4 64
+; CHECK-NEXT:     store 8 r1 sp 400
+; CHECK-NEXT:     r1 = add r9 5 64
+; CHECK-NEXT:     store 8 r3 sp 408
+; CHECK-NEXT:     r3 = add r9 6 64
+; CHECK-NEXT:     store 8 r5 sp 416
+; CHECK-NEXT:     r5 = add r9 7 64
+; CHECK-NEXT:     store 8 r7 sp 424
+; CHECK-NEXT:     r7 = add r9 8 64
+; CHECK-NEXT:     store 8 r2 sp 432
+; CHECK-NEXT:     r2 = add r9 9 64
+; CHECK-NEXT:     store 8 r6 sp 440
+; CHECK-NEXT:     r6 = add r9 10 64
+; CHECK-NEXT:     store 8 r4 sp 448
+; CHECK-NEXT:     r4 = add r9 11 64
+; CHECK-NEXT:     store 8 r1 sp 456
+; CHECK-NEXT:     r1 = add r9 12 64
+; CHECK-NEXT:     store 8 r3 sp 464
+; CHECK-NEXT:     r3 = add r9 13 64
+; CHECK-NEXT:     store 8 r5 sp 472
+; CHECK-NEXT:     r5 = add r9 14 64
+; CHECK-NEXT:     store 8 r7 sp 480
+; CHECK-NEXT:     r7 = add r9 15 64
+; CHECK-NEXT:     store 8 r2 sp 488
+; CHECK-NEXT:     r2 = add r9 16 64
+; CHECK-NEXT:     store 8 r6 sp 496
+; CHECK-NEXT:     r6 = add r9 17 64
+; CHECK-NEXT:     store 8 r4 sp 504
+; CHECK-NEXT:     r4 = add r9 18 64
+; CHECK-NEXT:     store 8 r1 sp 512
+; CHECK-NEXT:     r1 = add r9 19 64
+; CHECK-NEXT:     store 8 r3 sp 520
+; CHECK-NEXT:     r3 = add r9 20 64
+; CHECK-NEXT:     store 8 r5 sp 528
+; CHECK-NEXT:     r5 = add r9 21 64
+; CHECK-NEXT:     store 8 r7 sp 536
+; CHECK-NEXT:     r7 = add r9 22 64
+; CHECK-NEXT:     store 8 r2 sp 544
+; CHECK-NEXT:     r2 = add r9 23 64
+; CHECK-NEXT:     store 8 r6 sp 552
+; CHECK-NEXT:     r6 = add r9 24 64
+; CHECK-NEXT:     store 8 r4 sp 560
+; CHECK-NEXT:     r4 = add r9 25 64
+; CHECK-NEXT:     store 8 r1 sp 568
+; CHECK-NEXT:     r1 = add r9 26 64
+; CHECK-NEXT:     store 8 r3 sp 576
+; CHECK-NEXT:     r3 = add r9 27 64
+; CHECK-NEXT:     store 8 r5 sp 584
+; CHECK-NEXT:     r5 = add r9 28 64
+; CHECK-NEXT:     store 8 r7 sp 592
+; CHECK-NEXT:     r7 = add r9 29 64
+; CHECK-NEXT:     store 8 r2 sp 600
+; CHECK-NEXT:     r2 = add r9 30 64
+; CHECK-NEXT:     store 8 r6 sp 608
+; CHECK-NEXT:     r6 = add r9 31 64
+; CHECK-NEXT:     store 8 r4 sp 616
+; CHECK-NEXT:     r4 = add r9 32 64
+; CHECK-NEXT:     store 8 r1 sp 624
+; CHECK-NEXT:     r1 = add r9 33 64
+; CHECK-NEXT:     store 8 r3 sp 632
+; CHECK-NEXT:     r3 = add r9 34 64
+; CHECK-NEXT:     store 8 r5 sp 640
+; CHECK-NEXT:     r5 = add r9 35 64
+; CHECK-NEXT:     store 8 r7 sp 648
+; CHECK-NEXT:     r7 = add r9 36 64
+; CHECK-NEXT:     store 8 r2 sp 656
+; CHECK-NEXT:     r2 = add r9 37 64
+; CHECK-NEXT:     store 8 r6 sp 664
+; CHECK-NEXT:     r6 = add r9 38 64
+; CHECK-NEXT:     store 8 r4 sp 672
+; CHECK-NEXT:     r4 = add r9 39 64
+; CHECK-NEXT:     store 8 r1 sp 680
+; CHECK-NEXT:     r1 = add r9 40 64
+; CHECK-NEXT:     store 8 r3 sp 688
+; CHECK-NEXT:     r3 = add r9 41 64
+; CHECK-NEXT:     store 8 r5 sp 696
+; CHECK-NEXT:     r5 = add r9 42 64
+; CHECK-NEXT:     store 8 r7 sp 704
+; CHECK-NEXT:     r7 = add r9 43 64
+; CHECK-NEXT:     store 8 r2 sp 712
+; CHECK-NEXT:     r2 = add r9 44 64
+; CHECK-NEXT:     store 8 r6 sp 720
+; CHECK-NEXT:     r6 = add r9 45 64
+; CHECK-NEXT:     store 8 r4 sp 728
+; CHECK-NEXT:     r16 = add r9 46 64
+; CHECK-NEXT:     r15 = add r9 47 64
+; CHECK-NEXT:     r14 = add r9 48 64
+; CHECK-NEXT:     r13 = add r9 49 64
+; CHECK-NEXT:     br .for.inc
+; CHECK:   .for.cond.cleanup:
+; CHECK-NEXT:     br .for.end
+; CHECK:   .for.inc:
+; CHECK-NEXT:     r8 = load 8 sp 400
+; CHECK-NEXT:     store 8 r1 sp 736
+; CHECK-NEXT:     r12 = add r8 1 32
+; CHECK-NEXT:     r1 = load 8 sp 416
+; CHECK-NEXT:     r4 = load 8 sp 424
+; CHECK-NEXT:     store 8 r3 sp 744
+; CHECK-NEXT:     r3 = load 8 sp 432
+; CHECK-NEXT:     store 8 r5 sp 752
+; CHECK-NEXT:     r5 = load 8 sp 440
+; CHECK-NEXT:     store 8 r7 sp 760
+; CHECK-NEXT:     r7 = load 8 sp 448
+; CHECK-NEXT:     store 8 r2 sp 768
+; CHECK-NEXT:     r2 = load 8 sp 456
+; CHECK-NEXT:     store 8 r6 sp 776
+; CHECK-NEXT:     r6 = load 8 sp 464
+; CHECK-NEXT:     store 8 r8 sp 400
+; CHECK-NEXT:     r8 = load 8 sp 472
+; CHECK-NEXT:     store 8 r1 sp 416
+; CHECK-NEXT:     r1 = load 8 sp 480
+; CHECK-NEXT:     store 8 r4 sp 424
+; CHECK-NEXT:     r4 = load 8 sp 488
+; CHECK-NEXT:     store 8 r3 sp 432
+; CHECK-NEXT:     r3 = load 8 sp 496
+; CHECK-NEXT:     store 8 r5 sp 440
+; CHECK-NEXT:     r5 = load 8 sp 504
+; CHECK-NEXT:     store 8 r7 sp 448
+; CHECK-NEXT:     r7 = load 8 sp 512
+; CHECK-NEXT:     store 8 r2 sp 456
+; CHECK-NEXT:     r2 = load 8 sp 520
+; CHECK-NEXT:     store 8 r6 sp 464
+; CHECK-NEXT:     r6 = load 8 sp 528
+; CHECK-NEXT:     store 8 r8 sp 472
+; CHECK-NEXT:     r8 = load 8 sp 536
+; CHECK-NEXT:     store 8 r1 sp 480
+; CHECK-NEXT:     r1 = load 8 sp 544
+; CHECK-NEXT:     store 8 r4 sp 488
+; CHECK-NEXT:     r4 = load 8 sp 552
+; CHECK-NEXT:     store 8 r3 sp 496
+; CHECK-NEXT:     r3 = load 8 sp 560
+; CHECK-NEXT:     store 8 r5 sp 504
+; CHECK-NEXT:     r5 = load 8 sp 568
+; CHECK-NEXT:     store 8 r7 sp 512
+; CHECK-NEXT:     r7 = load 8 sp 576
+; CHECK-NEXT:     store 8 r2 sp 520
+; CHECK-NEXT:     r2 = load 8 sp 584
+; CHECK-NEXT:     store 8 r6 sp 528
+; CHECK-NEXT:     r6 = load 8 sp 592
+; CHECK-NEXT:     store 8 r8 sp 536
+; CHECK-NEXT:     r8 = load 8 sp 600
+; CHECK-NEXT:     store 8 r1 sp 544
+; CHECK-NEXT:     r1 = load 8 sp 608
+; CHECK-NEXT:     store 8 r4 sp 552
+; CHECK-NEXT:     r4 = load 8 sp 616
+; CHECK-NEXT:     store 8 r3 sp 560
+; CHECK-NEXT:     r3 = load 8 sp 624
+; CHECK-NEXT:     store 8 r5 sp 568
+; CHECK-NEXT:     r5 = load 8 sp 632
+; CHECK-NEXT:     store 8 r7 sp 576
+; CHECK-NEXT:     r7 = load 8 sp 640
+; CHECK-NEXT:     store 8 r2 sp 584
+; CHECK-NEXT:     r2 = load 8 sp 648
+; CHECK-NEXT:     store 8 r6 sp 592
+; CHECK-NEXT:     r6 = load 8 sp 656
+; CHECK-NEXT:     store 8 r8 sp 600
+; CHECK-NEXT:     r8 = load 8 sp 664
+; CHECK-NEXT:     store 8 r1 sp 608
+; CHECK-NEXT:     r1 = load 8 sp 672
+; CHECK-NEXT:     store 8 r4 sp 616
+; CHECK-NEXT:     r4 = load 8 sp 680
+; CHECK-NEXT:     store 8 r3 sp 624
+; CHECK-NEXT:     r3 = load 8 sp 688
+; CHECK-NEXT:     store 8 r5 sp 632
+; CHECK-NEXT:     r5 = load 8 sp 696
+; CHECK-NEXT:     store 8 r7 sp 640
+; CHECK-NEXT:     r7 = load 8 sp 704
+; CHECK-NEXT:     store 8 r2 sp 648
+; CHECK-NEXT:     r2 = load 8 sp 712
+; CHECK-NEXT:     store 8 r6 sp 656
+; CHECK-NEXT:     r6 = load 8 sp 720
+; CHECK-NEXT:     store 8 r8 sp 664
+; CHECK-NEXT:     r8 = load 8 sp 728
+; CHECK-NEXT:     store 8 r1 sp 672
+; CHECK-NEXT:     r1 = load 8 sp 736
+; CHECK-NEXT:     store 8 r4 sp 680
+; CHECK-NEXT:     r4 = load 8 sp 744
+; CHECK-NEXT:     store 8 r3 sp 688
+; CHECK-NEXT:     r3 = load 8 sp 752
+; CHECK-NEXT:     store 8 r5 sp 696
+; CHECK-NEXT:     r5 = load 8 sp 760
+; CHECK-NEXT:     store 8 r7 sp 704
+; CHECK-NEXT:     r7 = load 8 sp 768
+; CHECK-NEXT:     store 8 r2 sp 712
+; CHECK-NEXT:     r2 = load 8 sp 776
+; CHECK-NEXT:     store 8 r6 sp 720
+; CHECK-NEXT:     r6 = load 8 sp 416
+; CHECK-NEXT:     store 8 r6 sp 0
+; CHECK-NEXT:     store 8 r8 sp 728
+; CHECK-NEXT:     r8 = load 8 sp 424
+; CHECK-NEXT:     store 8 r8 sp 8
+; CHECK-NEXT:     store 8 r1 sp 736
+; CHECK-NEXT:     r1 = load 8 sp 432
+; CHECK-NEXT:     store 8 r1 sp 16
+; CHECK-NEXT:     store 8 r4 sp 744
+; CHECK-NEXT:     r4 = load 8 sp 440
+; CHECK-NEXT:     store 8 r4 sp 24
+; CHECK-NEXT:     store 8 r3 sp 752
+; CHECK-NEXT:     r3 = load 8 sp 448
+; CHECK-NEXT:     store 8 r3 sp 32
+; CHECK-NEXT:     store 8 r5 sp 760
+; CHECK-NEXT:     r5 = load 8 sp 456
+; CHECK-NEXT:     store 8 r5 sp 40
+; CHECK-NEXT:     store 8 r7 sp 768
+; CHECK-NEXT:     r7 = load 8 sp 464
+; CHECK-NEXT:     store 8 r7 sp 48
+; CHECK-NEXT:     store 8 r2 sp 776
+; CHECK-NEXT:     r2 = load 8 sp 472
+; CHECK-NEXT:     store 8 r2 sp 56
+; CHECK-NEXT:     store 8 r6 sp 416
+; CHECK-NEXT:     r6 = load 8 sp 480
+; CHECK-NEXT:     store 8 r6 sp 64
+; CHECK-NEXT:     store 8 r8 sp 424
+; CHECK-NEXT:     r8 = load 8 sp 488
+; CHECK-NEXT:     store 8 r8 sp 72
+; CHECK-NEXT:     store 8 r1 sp 432
+; CHECK-NEXT:     r1 = load 8 sp 496
+; CHECK-NEXT:     store 8 r1 sp 80
+; CHECK-NEXT:     store 8 r4 sp 440
+; CHECK-NEXT:     r4 = load 8 sp 504
+; CHECK-NEXT:     store 8 r4 sp 88
+; CHECK-NEXT:     store 8 r3 sp 448
+; CHECK-NEXT:     r3 = load 8 sp 512
+; CHECK-NEXT:     store 8 r3 sp 96
+; CHECK-NEXT:     store 8 r5 sp 456
+; CHECK-NEXT:     r5 = load 8 sp 520
+; CHECK-NEXT:     store 8 r5 sp 104
+; CHECK-NEXT:     store 8 r7 sp 464
+; CHECK-NEXT:     r7 = load 8 sp 528
+; CHECK-NEXT:     store 8 r7 sp 112
+; CHECK-NEXT:     store 8 r2 sp 472
+; CHECK-NEXT:     r2 = load 8 sp 536
+; CHECK-NEXT:     store 8 r2 sp 120
+; CHECK-NEXT:     store 8 r6 sp 480
+; CHECK-NEXT:     r6 = load 8 sp 544
+; CHECK-NEXT:     store 8 r6 sp 128
+; CHECK-NEXT:     store 8 r8 sp 488
+; CHECK-NEXT:     r8 = load 8 sp 552
+; CHECK-NEXT:     store 8 r8 sp 136
+; CHECK-NEXT:     store 8 r1 sp 496
+; CHECK-NEXT:     r1 = load 8 sp 560
+; CHECK-NEXT:     store 8 r1 sp 144
+; CHECK-NEXT:     store 8 r4 sp 504
+; CHECK-NEXT:     r4 = load 8 sp 568
+; CHECK-NEXT:     store 8 r4 sp 152
+; CHECK-NEXT:     store 8 r3 sp 512
+; CHECK-NEXT:     r3 = load 8 sp 576
+; CHECK-NEXT:     store 8 r3 sp 160
+; CHECK-NEXT:     store 8 r5 sp 520
+; CHECK-NEXT:     r5 = load 8 sp 584
+; CHECK-NEXT:     store 8 r5 sp 168
+; CHECK-NEXT:     store 8 r7 sp 528
+; CHECK-NEXT:     r7 = load 8 sp 592
+; CHECK-NEXT:     store 8 r7 sp 176
+; CHECK-NEXT:     store 8 r2 sp 536
+; CHECK-NEXT:     r2 = load 8 sp 600
+; CHECK-NEXT:     store 8 r2 sp 184
+; CHECK-NEXT:     store 8 r6 sp 544
+; CHECK-NEXT:     r6 = load 8 sp 608
+; CHECK-NEXT:     store 8 r6 sp 192
+; CHECK-NEXT:     store 8 r8 sp 552
+; CHECK-NEXT:     r8 = load 8 sp 616
+; CHECK-NEXT:     store 8 r8 sp 200
+; CHECK-NEXT:     store 8 r1 sp 560
+; CHECK-NEXT:     r1 = load 8 sp 624
+; CHECK-NEXT:     store 8 r1 sp 208
+; CHECK-NEXT:     store 8 r4 sp 568
+; CHECK-NEXT:     r4 = load 8 sp 632
+; CHECK-NEXT:     store 8 r4 sp 216
+; CHECK-NEXT:     store 8 r3 sp 576
+; CHECK-NEXT:     r3 = load 8 sp 640
+; CHECK-NEXT:     store 8 r3 sp 224
+; CHECK-NEXT:     store 8 r5 sp 584
+; CHECK-NEXT:     r5 = load 8 sp 648
+; CHECK-NEXT:     store 8 r5 sp 232
+; CHECK-NEXT:     store 8 r7 sp 592
+; CHECK-NEXT:     r7 = load 8 sp 656
+; CHECK-NEXT:     store 8 r7 sp 240
+; CHECK-NEXT:     store 8 r2 sp 600
+; CHECK-NEXT:     r2 = load 8 sp 664
+; CHECK-NEXT:     store 8 r2 sp 248
+; CHECK-NEXT:     store 8 r6 sp 608
+; CHECK-NEXT:     r6 = load 8 sp 672
+; CHECK-NEXT:     store 8 r6 sp 256
+; CHECK-NEXT:     store 8 r8 sp 616
+; CHECK-NEXT:     r8 = load 8 sp 680
+; CHECK-NEXT:     store 8 r8 sp 264
+; CHECK-NEXT:     store 8 r1 sp 624
+; CHECK-NEXT:     r1 = load 8 sp 688
+; CHECK-NEXT:     store 8 r1 sp 272
+; CHECK-NEXT:     store 8 r4 sp 632
+; CHECK-NEXT:     r4 = load 8 sp 696
+; CHECK-NEXT:     store 8 r4 sp 280
+; CHECK-NEXT:     store 8 r3 sp 640
+; CHECK-NEXT:     r3 = load 8 sp 704
+; CHECK-NEXT:     store 8 r3 sp 288
+; CHECK-NEXT:     store 8 r5 sp 648
+; CHECK-NEXT:     r5 = load 8 sp 712
+; CHECK-NEXT:     store 8 r5 sp 296
+; CHECK-NEXT:     store 8 r7 sp 656
+; CHECK-NEXT:     r7 = load 8 sp 720
+; CHECK-NEXT:     store 8 r7 sp 304
+; CHECK-NEXT:     store 8 r2 sp 664
+; CHECK-NEXT:     r2 = load 8 sp 728
+; CHECK-NEXT:     store 8 r2 sp 312
+; CHECK-NEXT:     store 8 r6 sp 672
+; CHECK-NEXT:     r6 = load 8 sp 736
+; CHECK-NEXT:     store 8 r6 sp 320
+; CHECK-NEXT:     store 8 r8 sp 680
+; CHECK-NEXT:     r8 = load 8 sp 744
+; CHECK-NEXT:     store 8 r8 sp 328
+; CHECK-NEXT:     store 8 r1 sp 688
+; CHECK-NEXT:     r1 = load 8 sp 752
+; CHECK-NEXT:     store 8 r1 sp 336
+; CHECK-NEXT:     store 8 r4 sp 696
+; CHECK-NEXT:     r4 = load 8 sp 760
+; CHECK-NEXT:     store 8 r4 sp 344
+; CHECK-NEXT:     store 8 r3 sp 704
+; CHECK-NEXT:     r3 = load 8 sp 768
+; CHECK-NEXT:     store 8 r3 sp 352
+; CHECK-NEXT:     store 8 r5 sp 712
+; CHECK-NEXT:     r5 = load 8 sp 776
+; CHECK-NEXT:     store 8 r5 sp 360
+; CHECK-NEXT:     store 8 r16 sp 368
+; CHECK-NEXT:     store 8 r15 sp 376
+; CHECK-NEXT:     store 8 r14 sp 384
+; CHECK-NEXT:     store 8 r13 sp 392
+; CHECK-NEXT:     store 8 r12 sp 400
+; CHECK-NEXT:     br .for.cond
+; CHECK:   .for.end:
+; CHECK-NEXT:     store 8 0 sp 784
+; CHECK-NEXT:     br .for.cond51
+; CHECK:   .for.cond51:
+; CHECK-NEXT:     store 8 r7 sp 720
+; CHECK-NEXT:     r7 = load 8 sp 784
+; CHECK-NEXT:     store 8 r2 sp 728
+; CHECK-NEXT:     store 8 r6 sp 736
+; CHECK-NEXT:     r11 = icmp sle r7 50 32
+; CHECK-NEXT:     br r11 .for.body54 .for.cond.cleanup53
+; CHECK:   .for.body54:
+; CHECK-NEXT:     r6 = load 8 sp 0
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     r2 = load 8 sp 8
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     store 8 r8 sp 744
+; CHECK-NEXT:     r8 = load 8 sp 16
+; CHECK-NEXT:     call write r8
+; CHECK-NEXT:     store 8 r1 sp 752
+; CHECK-NEXT:     r1 = load 8 sp 24
+; CHECK-NEXT:     call write r1
+; CHECK-NEXT:     store 8 r4 sp 760
+; CHECK-NEXT:     r4 = load 8 sp 32
+; CHECK-NEXT:     call write r4
+; CHECK-NEXT:     store 8 r3 sp 768
+; CHECK-NEXT:     r3 = load 8 sp 40
+; CHECK-NEXT:     call write r3
+; CHECK-NEXT:     store 8 r5 sp 776
+; CHECK-NEXT:     r5 = load 8 sp 48
+; CHECK-NEXT:     call write r5
+; CHECK-NEXT:     store 8 r7 sp 784
+; CHECK-NEXT:     r7 = load 8 sp 56
+; CHECK-NEXT:     call write r7
+; CHECK-NEXT:     store 8 r6 sp 0
+; CHECK-NEXT:     r6 = load 8 sp 64
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     store 8 r2 sp 8
+; CHECK-NEXT:     r2 = load 8 sp 72
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     store 8 r8 sp 16
+; CHECK-NEXT:     r8 = load 8 sp 80
+; CHECK-NEXT:     call write r8
+; CHECK-NEXT:     store 8 r1 sp 24
+; CHECK-NEXT:     r1 = load 8 sp 88
+; CHECK-NEXT:     call write r1
+; CHECK-NEXT:     store 8 r4 sp 32
+; CHECK-NEXT:     r4 = load 8 sp 96
+; CHECK-NEXT:     call write r4
+; CHECK-NEXT:     store 8 r3 sp 40
+; CHECK-NEXT:     r3 = load 8 sp 104
+; CHECK-NEXT:     call write r3
+; CHECK-NEXT:     store 8 r5 sp 48
+; CHECK-NEXT:     r5 = load 8 sp 112
+; CHECK-NEXT:     call write r5
+; CHECK-NEXT:     store 8 r7 sp 56
+; CHECK-NEXT:     r7 = load 8 sp 120
+; CHECK-NEXT:     call write r7
+; CHECK-NEXT:     store 8 r6 sp 64
+; CHECK-NEXT:     r6 = load 8 sp 128
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     store 8 r2 sp 72
+; CHECK-NEXT:     r2 = load 8 sp 136
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     store 8 r8 sp 80
+; CHECK-NEXT:     r8 = load 8 sp 144
+; CHECK-NEXT:     call write r8
+; CHECK-NEXT:     store 8 r1 sp 88
+; CHECK-NEXT:     r1 = load 8 sp 152
+; CHECK-NEXT:     call write r1
+; CHECK-NEXT:     store 8 r4 sp 96
+; CHECK-NEXT:     r4 = load 8 sp 160
+; CHECK-NEXT:     call write r4
+; CHECK-NEXT:     store 8 r3 sp 104
+; CHECK-NEXT:     r3 = load 8 sp 168
+; CHECK-NEXT:     call write r3
+; CHECK-NEXT:     store 8 r5 sp 112
+; CHECK-NEXT:     r5 = load 8 sp 176
+; CHECK-NEXT:     call write r5
+; CHECK-NEXT:     store 8 r7 sp 120
+; CHECK-NEXT:     r7 = load 8 sp 184
+; CHECK-NEXT:     call write r7
+; CHECK-NEXT:     store 8 r6 sp 128
+; CHECK-NEXT:     r6 = load 8 sp 192
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     store 8 r2 sp 136
+; CHECK-NEXT:     r2 = load 8 sp 200
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     store 8 r8 sp 144
+; CHECK-NEXT:     r8 = load 8 sp 208
+; CHECK-NEXT:     call write r8
+; CHECK-NEXT:     store 8 r1 sp 152
+; CHECK-NEXT:     r1 = load 8 sp 216
+; CHECK-NEXT:     call write r1
+; CHECK-NEXT:     store 8 r4 sp 160
+; CHECK-NEXT:     r4 = load 8 sp 224
+; CHECK-NEXT:     call write r4
+; CHECK-NEXT:     store 8 r3 sp 168
+; CHECK-NEXT:     r3 = load 8 sp 232
+; CHECK-NEXT:     call write r3
+; CHECK-NEXT:     store 8 r5 sp 176
+; CHECK-NEXT:     r5 = load 8 sp 240
+; CHECK-NEXT:     call write r5
+; CHECK-NEXT:     store 8 r7 sp 184
+; CHECK-NEXT:     r7 = load 8 sp 248
+; CHECK-NEXT:     call write r7
+; CHECK-NEXT:     store 8 r6 sp 192
+; CHECK-NEXT:     r6 = load 8 sp 256
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     store 8 r2 sp 200
+; CHECK-NEXT:     r2 = load 8 sp 264
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     store 8 r8 sp 208
+; CHECK-NEXT:     r8 = load 8 sp 272
+; CHECK-NEXT:     call write r8
+; CHECK-NEXT:     store 8 r1 sp 216
+; CHECK-NEXT:     r1 = load 8 sp 280
+; CHECK-NEXT:     call write r1
+; CHECK-NEXT:     store 8 r4 sp 224
+; CHECK-NEXT:     r4 = load 8 sp 288
+; CHECK-NEXT:     call write r4
+; CHECK-NEXT:     store 8 r3 sp 232
+; CHECK-NEXT:     r3 = load 8 sp 296
+; CHECK-NEXT:     call write r3
+; CHECK-NEXT:     store 8 r5 sp 240
+; CHECK-NEXT:     r5 = load 8 sp 304
+; CHECK-NEXT:     call write r5
+; CHECK-NEXT:     store 8 r7 sp 248
+; CHECK-NEXT:     r7 = load 8 sp 312
+; CHECK-NEXT:     call write r7
+; CHECK-NEXT:     store 8 r6 sp 256
+; CHECK-NEXT:     r6 = load 8 sp 320
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     store 8 r2 sp 264
+; CHECK-NEXT:     r2 = load 8 sp 328
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     store 8 r8 sp 272
+; CHECK-NEXT:     r8 = load 8 sp 336
+; CHECK-NEXT:     call write r8
+; CHECK-NEXT:     store 8 r1 sp 280
+; CHECK-NEXT:     r1 = load 8 sp 344
+; CHECK-NEXT:     call write r1
+; CHECK-NEXT:     store 8 r4 sp 288
+; CHECK-NEXT:     r4 = load 8 sp 352
+; CHECK-NEXT:     call write r4
+; CHECK-NEXT:     store 8 r3 sp 296
+; CHECK-NEXT:     r3 = load 8 sp 360
+; CHECK-NEXT:     call write r3
+; CHECK-NEXT:     store 8 r5 sp 304
+; CHECK-NEXT:     r5 = load 8 sp 368
+; CHECK-NEXT:     call write r5
+; CHECK-NEXT:     store 8 r7 sp 312
+; CHECK-NEXT:     r7 = load 8 sp 376
+; CHECK-NEXT:     call write r7
+; CHECK-NEXT:     store 8 r6 sp 320
+; CHECK-NEXT:     r6 = load 8 sp 384
+; CHECK-NEXT:     call write r6
+; CHECK-NEXT:     store 8 r2 sp 328
+; CHECK-NEXT:     r2 = load 8 sp 392
+; CHECK-NEXT:     call write r2
+; CHECK-NEXT:     br .for.inc55
+; CHECK:   .for.cond.cleanup53:
+; CHECK-NEXT:     br .for.end57
+; CHECK:   .for.inc55:
+; CHECK-NEXT:     store 8 r8 sp 336
+; CHECK-NEXT:     r8 = load 8 sp 784
+; CHECK-NEXT:     store 8 r1 sp 344
+; CHECK-NEXT:     store 8 r4 sp 352
+; CHECK-NEXT:     r10 = add r8 1 32
+; CHECK-NEXT:     store 8 r10 sp 784
+; CHECK-NEXT:     br .for.cond51
+; CHECK:   .for.end57:
+; CHECK-NEXT:     ret 0
 entry:
   %call = call i64 (...) @read()
   br label %for.cond

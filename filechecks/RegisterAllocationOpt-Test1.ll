@@ -1,5 +1,5 @@
 define void @print_bit(i64 %x) #0 {
-; CHECK: start print_bit 1:
+; CHECK:  start print_bit 1:
 ; CHECK:  .entry:
 ; CHECK-NEXT:    ; init sp!
 ; CHECK-NEXT:    sp = sub sp 8 64
@@ -7,18 +7,18 @@ define void @print_bit(i64 %x) #0 {
 ; CHECK-NEXT:    br .for.cond
 ; CHECK:  .for.cond:
 ; CHECK-NEXT:    r1 = load 8 sp 0
-; CHECK-NEXT:    r12 = icmp sge r1 0 64
-; CHECK-NEXT:    br r12 .for.body .for.cond.cleanup
+; CHECK-NEXT:    r15 = icmp sge r1 0 64
+; CHECK-NEXT:    br r15 .for.body .for.cond.cleanup
+; CHECK:  .for.body:
+; CHECK-NEXT:    r14 = lshr arg1 r1 64
+; CHECK-NEXT:    r13 = and r14 1 64
+; CHECK-NEXT:    call write r13
+; CHECK-NEXT:    br .for.inc
 ; CHECK:  .for.cond.cleanup:
 ; CHECK-NEXT:    br .for.end
-; CHECK:  .for.body:
-; CHECK-NEXT:    r11 = lshr arg1 r1 64
-; CHECK-NEXT:    r10 = and r11 1 64
-; CHECK-NEXT:    call write r10
-; CHECK-NEXT:    br .for.inc
 ; CHECK:  .for.inc:
-; CHECK-NEXT:    r9 = add r1 18446744073709551615 64
-; CHECK-NEXT:    store 8 r9 sp 0
+; CHECK-NEXT:    r12 = add r1 18446744073709551615 64
+; CHECK-NEXT:    store 8 r12 sp 0
 ; CHECK-NEXT:    br .for.cond
 ; CHECK:  .for.end:
 ; CHECK-NEXT:    call write 10
@@ -53,8 +53,8 @@ for.end:                                          ; preds = %for.cond.cleanup
 define i32 @main() #0 {
 ; CHECK: start main 0:
 ; CHECK:   .entry:
-; CHECK-NEXT:     r9 = call read
-; CHECK-NEXT:     call print_bit r9
+; CHECK-NEXT:     r16 = call read
+; CHECK-NEXT:     call print_bit r16
 ; CHECK-NEXT:     ret 0
 entry:
   %call = call i64 (...) @read()
