@@ -1,19 +1,9 @@
 #include "Team4Passes.h"
-#include "llvm/Analysis/MemoryBuiltins.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/Pass.h"
-#include "llvm/PassAnalysisSupport.h"
-#include "llvm/Analysis/ValueTracking.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/Constants.h"
-
-
-  uint64_t MAXSIZE = 2048;
+#define MAXSIZE 2048
 
   // find all malloc call instructions in the function and check if they satisfy the condition
-  // Condition 1. Size should be lower than 2048
+  // Condition 1. allocated size should be Constant. no dynamic allocation.
+  // Condition 2. Size should be lower than 2048
   void  Malloc2AllocPass::findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs) {
     for(auto &BB : F) {
       for(auto &I : BB) {
@@ -21,8 +11,10 @@
         auto *CI = dyn_cast<CallInst>(&I);
         if(CI && (CI->getCalledFunction()->getName() == "malloc")) {
           ConstantInt *MallocSize = dyn_cast<ConstantInt>(CI->getArgOperand(0));
-          // check if the size of malloc-ed block is smaller than 2048.
-          if((*MallocSize).getZExtValue() <= MAXSIZE) {
+          // check if the size of malloc-ed block is constant && smaller than 2048.
+          if(MallocSize && MallocSize->getZExtValue() <= MAXSIZE) {
+            assert(MallocSize && "malloc instruction does not have constant argument : dynamic allocation!");
+            assert(MallocSize->getZExtValue() <= MAXSIZE && "malloc allocates more than 2048 bytes!");
             PossibleMallocs.push_back(CI);
           }
         }
@@ -31,57 +23,104 @@
   }
 
   // Find malloc call instruction among PossibleMallocs that can be replaced with alloc.
-  // If free instruction is in the successor block && it frees the same pointer allocated by malloc,
-  // that malloc is replaceable.
-  void  Malloc2AllocPass::findReplaceableMallocs(Function &F, vector<Instruction*> &PossibleMallocs, vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees) {
-
+  // If malloc is freed in every path to the exit block, that malloc is replaceable.
+  void  Malloc2AllocPass::findReplaceableMallocs(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> &PossibleMallocs, 
+  vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees) {
+      auto &TLI = FAM.getResult<TargetLibraryAnalysis>(F);
       auto &DL = F.getParent()->getDataLayout();
 
       for(auto &I : PossibleMallocs) {
+        bool IsReplaceable = false;
         BasicBlock *Parent = I->getParent();
-        //outs()<<"Checking Instruction : "<< *I << " in block ( "<<Parent->getName()<<" ) \n";
-
-        // find the basic blocks that are reachable from the Parent and store them in 'reachables'
-        std::vector<BasicBlock*> reachables;
-        std::vector<BasicBlock*> blockQueue;
-        blockQueue.push_back(Parent);
-
-        while (!blockQueue.empty()) {
-            BasicBlock *block = blockQueue.front();
-            blockQueue.erase(blockQueue.begin());
-            std::string blockName = block->getName();
-            if (std::find(reachables.begin(), reachables.end(), block) != reachables.end())
-                continue;
-            reachables.push_back(block);
-
-            unsigned successorCnt = block->getTerminator()->getNumSuccessors();
-            for (unsigned i = 0; i < successorCnt; i++)
-                blockQueue.push_back(block->getTerminator()->getSuccessor(i));
+        // First, check if malloc I is freed in the same block
+        for(auto &J : (*Parent)) {
+          if(isFreeCall(&J,&TLI) && (GetUnderlyingObject(J.getOperand(0),DL) == I)){
+            RemovableFrees.push_back(&J);
+            ReplaceableMallocs.push_back(I);
+            IsReplaceable = true;
+            break;
+          }
         }
-      
-        for(auto *BB : reachables) {
-            for(auto &J : (*BB)) {
-                auto *CI = dyn_cast<CallInst>(&J);
-                // Check if CI is free call instruction.
-                if(CI && (CI->getCalledFunction()->getName() == "free")) {
-                    //outs()<<"found free call instruction : "<<*CI<<"\n";
-                    SmallPtrSet<Instruction *, 4> MallocCalls;
-                    MallocCalls.insert(I);
-                    auto *freeptr = GetUnderlyingObject(CI->getOperand(0),DL);
-                    //outs() << "Getunderlyingobject gets : " << *freeptr<<"\n";
-                    // Check if pointer freed by Fre inst CI points to the same block allocated by Malloc inst I.
-                    if(MallocCalls.count(cast<Instruction>(freeptr))) {
-                        //outs()<<*I<< " is freed by "<<*CI<<"\n";
-                        ReplaceableMallocs.push_back(I);
-                        RemovableFrees.push_back(CI);
-                    }
-                }
+        if(IsReplaceable || (Parent->getTerminator()->getNumSuccessors() == 0)) continue;
+
+        // Now, we know that malloc is not freed in the same block. Check if malloc is being freed in successor blocks.
+        // Use DFS-like method to find go over all path to the exit block.
+        // If it is freed in every path to the exit block, malloc is replaceable. If not, it is not replaceable.
+        vector<pair<BasicBlock*,vector<Instruction*>>> DFSStack;
+        for(auto SuccBB : successors(Parent)) {
+          vector<Instruction*> MallocPtrs;
+          MallocPtrs.push_back(I);
+          // store malloc pointers transferred by PHINodes.
+          for(auto J = SuccBB->begin(); J != BasicBlock::iterator(SuccBB->getFirstNonPHI()); J++) {
+            auto *PHI = dyn_cast<PHINode>(J);
+            if(PHI->getBasicBlockIndex(Parent) >= 0 && GetUnderlyingObject(PHI->getIncomingValueForBlock(Parent),DL) == I) {
+                MallocPtrs.push_back(PHI);
             }
+          }
+          DFSStack.push_back(make_pair(SuccBB, MallocPtrs));
+        }
+
+        pair<BasicBlock*,vector<Instruction*>> StackElem;
+        vector<BasicBlock*> Visited;
+        IsReplaceable = true;
+        vector<Instruction*> temp_RemovableFrees;
+        // Begin DFS-like visiting method
+        while(!DFSStack.empty()) {
+          bool IsFreed = false;
+          StackElem = DFSStack.back(); 
+          DFSStack.pop_back();
+          Visited.push_back(StackElem.first);
+          for(auto &J : *(StackElem.first) ){
+            if(isFreeCall(&J,&TLI)) {
+              auto *FreePtr = GetUnderlyingObject(J.getOperand(0),DL);
+              if(find(StackElem.second.begin(),StackElem.second.end(),FreePtr) != StackElem.second.end()) {
+                // Malloc is freed in this particular path. No more need to observe through the path.
+                temp_RemovableFrees.push_back(&J);
+                IsFreed = true;
+                break;
+              }
+            }            
+          }
+          if(IsFreed) continue;
+          // Malloc is not yet freed. Check next successors.
+          bool HasUnvisitedSucc = false;
+          for(auto SuccBB : successors(StackElem.first)) {
+            if(find(Visited.begin(),Visited.end(),SuccBB) != Visited.end()) {
+              // This block is already visited, thus already checked. No need to observe through it.
+              continue;
+            } 
+            // This block is not yet visited. Needs to be checked. Push into DFSStack after updating Malloc pointers.
+            HasUnvisitedSucc = true;
+            vector<Instruction*> MallocPtrs;
+            MallocPtrs.push_back(I);
+            for(auto J = SuccBB->begin(); J != BasicBlock::iterator(SuccBB->getFirstNonPHI()); J++) {
+              auto *PHI = dyn_cast<PHINode>(J);
+              if(PHI->getBasicBlockIndex(Parent) >= 0 && GetUnderlyingObject(PHI->getIncomingValueForBlock(Parent),DL) == I) {
+                  MallocPtrs.push_back(PHI);
+              }
+            }
+            DFSStack.push_back(make_pair(SuccBB, MallocPtrs));
+          }
+          if(!HasUnvisitedSucc) {
+            // All successors are already visited or it is exit block.
+            if(StackElem.first->getTerminator()->getNumSuccessors() == 0) {
+              IsReplaceable = false;
+              break;
+            }
+          }
+        }
+        if(IsReplaceable) {
+          // Malloc Inst I is freed in all paths.
+          for(auto *J : temp_RemovableFrees)
+            if(find(RemovableFrees.begin(), RemovableFrees.end(), J) == RemovableFrees.end())
+              RemovableFrees.push_back(J);
+          ReplaceableMallocs.push_back(I);
         }
     }
   }
 
-  void  Malloc2AllocPass::replaceMallocwithAlloc(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees) {
+  void  Malloc2AllocPass::replaceMallocwithAlloc(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> 
+  &ReplaceableMallocs, vector<Instruction*> &RemovableFrees) {
       LLVMContext &Context = F.getContext();
       IRBuilder<> IB(Context);
       auto &TLI = FAM.getResult<TargetLibraryAnalysis>(F);
@@ -95,9 +134,7 @@
           auto *CI = dyn_cast<CallInst>(I);
           Type *MallocType = getMallocAllocatedType(CI, &TLI);
           Value *MallocSize = getMallocArraySize(CI, DL, &TLI, true);
-          //outs()<<"MallocType : "<<*MallocType<<"\nMallocSize : "<<*MallocSize<<"\n";
-          IB.SetInsertPoint(CI);
-          //Value *Alloca = IB.CreateBitCast(IB.CreateAlloca(MallocType, MallocSize),CI->getType());
+          IB.SetInsertPoint(dyn_cast<Instruction>(F.getEntryBlock().getFirstInsertionPt()));
           Value *Alloca = IB.CreateAlloca(MallocType, MallocSize);
           Alloca->takeName(CI);
           CI->replaceAllUsesWith(Alloca);
@@ -111,25 +148,9 @@
     vector<Instruction*> ReplaceableMallocs;
     vector<Instruction*> RemovableFrees;
     
-    //outs()<<"start Malloc2Alloc Pass\n";
     findPossibleMallocs(F, PossibleMallocs);
-    /*outs()<<PossibleMallocs.size()<<"\n";
-    for(auto *I : PossibleMallocs) {
-        outs()<<"Malloc : "<<*I<<"\n";
-    }*/
-
-    findReplaceableMallocs(F,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
-    //outs()<<ReplaceableMallocs.size()<<"\n";
-    /*for(auto *I : ReplaceableMallocs) {
-        outs()<<"Replace Malloc : "<<*I<<"\n";
-    }
-    //outs()<<RemovableFrees.size()<<"\n";
-    for(auto *I : RemovableFrees) {
-        outs()<<"Remove Free : "<<*I<<"\n";
-    }*/
-
+    findReplaceableMallocs(F,FAM,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
     replaceMallocwithAlloc(F, FAM, ReplaceableMallocs,RemovableFrees);
-
     return PreservedAnalyses::all();
   }
 
