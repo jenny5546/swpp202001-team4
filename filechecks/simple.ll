@@ -1,5 +1,5 @@
 define void @main() {
 ; CHECK: start main 0:
-  ret void
+    ret void
 }
 ; CHECK: end main
