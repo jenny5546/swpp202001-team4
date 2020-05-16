@@ -50,7 +50,7 @@
         for(auto SuccBB : successors(Parent)) {
           vector<Instruction*> MallocPtrs;
           MallocPtrs.push_back(I);
-          // store malloc pointers transferred by PHINodes.
+          // Store malloc pointers transferred by PHINodes.
           for(auto J = SuccBB->begin(); J != BasicBlock::iterator(SuccBB->getFirstNonPHI()); J++) {
             auto *PHI = dyn_cast<PHINode>(J);
             if(PHI->getBasicBlockIndex(Parent) >= 0 && GetUnderlyingObject(PHI->getIncomingValueForBlock(Parent),DL) == I) {
@@ -109,6 +109,7 @@
             }
           }
         }
+        // Now, search is finished. If malloc is replaceable, push it into ReplaceableMallocs. If not, dont'.
         if(IsReplaceable) {
           // Malloc Inst I is freed in all paths.
           for(auto *J : temp_RemovableFrees)
@@ -147,10 +148,10 @@
     vector<Instruction*> PossibleMallocs;
     vector<Instruction*> ReplaceableMallocs;
     vector<Instruction*> RemovableFrees;
-    
+
     findPossibleMallocs(F, PossibleMallocs);
     findReplaceableMallocs(F,FAM,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
     replaceMallocwithAlloc(F, FAM, ReplaceableMallocs,RemovableFrees);
+
     return PreservedAnalyses::all();
   }
-
