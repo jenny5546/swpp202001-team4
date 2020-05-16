@@ -82,10 +82,10 @@ int main(int argc, char **argv) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
-  // FPM.addPass(DoNothingPass());
+  //FPM.addPass(DoNothingPass());
+  FPM.addPass(ArithmeticPass());
   FPM.addPass(SimplifyCFGPass());
   FPM.addPass(DCEPass());
 
