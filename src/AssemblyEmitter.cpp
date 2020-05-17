@@ -147,7 +147,12 @@ public:
   void addAlloca(AllocaInst *I) {
     assert(!AllocaStackOffset.count(I));
     AllocaStackOffset[I] = UsedStackSize;
-    UsedStackSize += (getAccessSize(I->getAllocatedType()) + 7) / 8 * 8;
+    auto *AllocElemNum = dyn_cast<ConstantInt>(I->getArraySize());
+    if(AllocElemNum) {
+      unsigned allocElemNum = AllocElemNum->getZExtValue();
+      UsedStackSize += ((getAccessSize(I->getAllocatedType()) + 7) / 8 * 8)*allocElemNum;
+    }
+    else UsedStackSize += ((getAccessSize(I->getAllocatedType()) + 7) / 8 * 8);
   }
 
   unsigned getStackOffset(AllocaInst *I) const {
