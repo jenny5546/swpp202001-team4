@@ -29,6 +29,9 @@ obj/ArithmeticPass.o: src/ArithmeticPass.cpp $(DEPS)
 obj/FunctionOutlinePass.o: src/FunctionOutlinePass.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
 
+obj/DepromoteRegisters.o: src/DepromoteRegisters.cpp $(DEPS)
+	@$(CXX) $(CXXFLAGS) -c -o $@ $<
+
 obj/SimpleBackend.o: src/SimpleBackend.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
 
