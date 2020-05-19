@@ -23,6 +23,10 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
             bool outLined = false;
             int regsInBlock = 0;
             Instruction *pointToInsert; 
+            vector<Value *> valuesToPreserve;
+
+            for (auto *itr = F.arg_begin(), *end = F.arg_end(); itr != end; ++itr)
+                valuesToPreserve.push_back(&*itr);
 
             for (auto &I : BB){
 
@@ -34,6 +38,9 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 //  Count regs with name in characters & regs that have names like %0, %1...
                 if (I.hasName() || !I.hasName() && !I.getType()->isVoidTy()) { 
                     regsInBlock ++;   
+                }
+                if (regsInBlock <= 13){
+                    valuesToPreserve.push_back(&I);
                 }
                 if (regsInBlock ==14){
                     pointToInsert = &I;
@@ -47,6 +54,14 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
             if (outLined){
 
                 BasicBlock *succ = BB.splitBasicBlock(pointToInsert, "outline");
+
+                unsigned useCnt = 0;
+                for (auto *v : valuesToPreserve)
+                    if (v->isUsedInBasicBlock(succ))
+                        useCnt++;
+                if (useCnt > 16)
+                    break;
+
                 BB.getTerminator()->eraseFromParent();
                 IRBuilder<> builder(&BB);
                 builder.CreateBr(succ);
@@ -54,7 +69,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 CodeExtractorAnalysisCache CEAC(F);
                 Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
 
-            }
+            } else break;
 
             /* 
                 Erase the llvm.lifetime.start, llvm.lifetime.end global function calls manually 

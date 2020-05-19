@@ -215,7 +215,7 @@ public:
     I1Ty = IntegerType::getInt1Ty(*Context);
     I8PtrTy = PointerType::getInt8PtrTy(*Context);
     ModuleToEmit->setDataLayout(M.getDataLayout());
-    DummyInst = CastInst::Create(CastInst::ZExt, ConstantInt::get(I64Ty, 0), I64Ty);
+    DummyInst = CastInst::Create(CastInst::ZExt, ConstantInt::get(I1Ty, 0), I64Ty);
 
     uint64_t GVOffset = 20480;
     FunctionType *MallocTy = nullptr;
@@ -265,6 +265,8 @@ public:
                                   "malloc", *ModuleToEmit);
     }
     for (Function &F : M) visitFunction(F);
+    
+    DummyInst->deleteValue();
   }
 
   void visitFunction(Function &F) {
