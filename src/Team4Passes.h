@@ -68,7 +68,6 @@ private:
   BasicBlock *BBToEmit = nullptr;
   unique_ptr<IRBuilder<TargetFolder>> Builder;
   Function *MallocFn = nullptr;
-  Instruction *DummyInst;
   unsigned TempRegCnt;
 
   /* data for building depromoted module */
@@ -107,6 +106,8 @@ private:
 
   /* after-depromotion clean-up functions */
   void resolveRegDependency();
+  void removeExtraMemoryInsts();
+  void cleanRedundantCasts();
 
 public:
   Module *getDepromotedModule() const;
@@ -129,6 +130,7 @@ public:
   void visitGetElementPtrInst(GetElementPtrInst &GEPI);
 
   /* casts */
+  string retrieveCastInstRegister(CastInst *CI);
   void visitBitCastInst(BitCastInst &BCI);
   void visitSExtInst(SExtInst &SI);
   void visitZExtInst(ZExtInst &ZI);

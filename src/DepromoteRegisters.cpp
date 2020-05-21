@@ -101,7 +101,6 @@ void DepromoteRegisters::saveInst(Value *Res, Instruction *I) {
   if (RegToAllocaMap.count(I)) 
     ValToAllocaMap[Res] = RegToAllocaMap[I];
   saveTempInst(I, Res);
-  evictTempInst(DummyInst);
 }
 
 void DepromoteRegisters::saveTempInst(Instruction *OldI, Value *Res) {
@@ -200,7 +199,8 @@ void DepromoteRegisters::resolveRegDependency() {
         auto *Op = SI->getValueOperand();
         auto *OpI = dyn_cast<Instruction>(Op);
 
-        if (!SI->getPointerOperand()->getName().endswith("_slot") || !OpI)
+        if ((!SI->getPointerOperand()->getName().endswith("_slot") &&
+             !SI->getPointerOperand()->getName().endswith("_phi")) || !OpI)
             continue;
 
         unsigned isStored = 0;
@@ -246,6 +246,113 @@ void DepromoteRegisters::resolveRegDependency() {
     (new LoadInst(entry.first, entry.second.first->getName()))->insertBefore(entry.second.second);
 }
 
+void DepromoteRegisters::removeExtraMemoryInsts() {
+  /* remove unnecessary memory operations introduced from resolving dependencies */
+  vector <Instruction *> InstsToRemove;
+
+  for (auto *BB : BasicBlockBFS) {
+    LoadInst *PrevLI = nullptr;
+    for (auto &I: *BBMap[BB]) {
+      if (I.hasName() && I.use_empty() && dyn_cast<AllocaInst>(&I)) {
+        InstsToRemove.push_back(&I);
+      } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
+        if (PrevLI != nullptr &&
+            PrevLI->getPointerOperand() == LI->getPointerOperand() &&
+            PrevLI->getPointerOperandType() == LI->getPointerOperandType() &&
+            PrevLI->getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) {
+          InstsToRemove.push_back(&I);
+          LI->replaceAllUsesWith(PrevLI);
+          continue;
+        }
+        PrevLI = LI;
+        continue;
+      } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+        auto *Op = SI->getValueOperand();
+        auto *OpI = dyn_cast<Instruction>(Op);
+        if (!SI->getPointerOperand()->getName().endswith("_slot") || !OpI) 
+          continue;
+        Value *PtyOp = ValToAllocaMap[Op];
+
+        vector<BasicBlock *> Reachables;
+        getBlockBFS(SI->getParent(), Reachables);
+
+        int isSelfChecked = 0, shouldRemove = 1;
+        for (BasicBlock *Reachable : Reachables) {
+          if (!shouldRemove)
+            break;
+          for (auto &RI : *Reachable) {
+            if (Reachable == SI->getParent() && !isSelfChecked) {
+              if (&RI == SI)
+                isSelfChecked = 1;
+              continue;
+            }
+            if (auto *LI = dyn_cast<LoadInst>(&RI)) {
+              if (LI->getPointerOperand() == PtyOp) {
+                  shouldRemove = 0;
+                  break;
+              }
+            }
+          }
+        }
+
+        if (shouldRemove)
+          InstsToRemove.push_back(&I);
+      }
+      PrevLI = nullptr;
+    }
+  }
+
+  for (auto *I : InstsToRemove) {
+    I->removeFromParent();
+    I->deleteValue();
+  }
+}
+
+void DepromoteRegisters::cleanRedundantCasts() {
+  
+  for (auto *BB : BasicBlockBFS) {
+    for (auto &I: *BBMap[BB]) {
+      if (auto *CI = dyn_cast<CastInst>(&I)) {
+        auto *Op = CI->getOperand(0);
+
+        if (!dyn_cast<Instruction>(Op) ||
+            Op->getName().str().find("before_zext__") != string::npos ||
+            CI->getName().str().find("after_trunc__") != string::npos ||
+            Op->getName().str().find("arg") != string::npos)
+          continue;
+        
+        unsigned usageCnt = 0;
+        Instruction *UserI;
+        for (auto itr = CI->use_begin(), end = CI->use_end(); itr != end; ++itr) {
+          if (dyn_cast<CastInst>(itr->getUser()) == CI)
+            continue;
+          usageCnt++;
+          UserI = dyn_cast<Instruction>(itr->getUser());
+        }
+
+        if (usageCnt > 1)
+          continue;
+        
+        int shouldCheck = 0;
+        for (auto &I: *CI->getParent()) {
+          if (&I == CI)
+            shouldCheck = 1;
+          else if (shouldCheck && (&I == UserI)) {
+       //     outs() << "Case made for \n";
+       //     outs() << *CI << "\n";
+       //     outs() << *UserI << "\n";
+            CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 6))));
+          }
+          else if (shouldCheck == 1)
+            shouldCheck++;
+          else if (shouldCheck > 1)
+            break;
+        }
+      }
+    }
+  }
+}
+
 Module *DepromoteRegisters::getDepromotedModule() const {
     return ModuleToEmit.get(); 
 }
@@ -257,7 +364,6 @@ void DepromoteRegisters::visitModule(Module &M) {
   I1Ty = IntegerType::getInt1Ty(*Context);
   I8PtrTy = PointerType::getInt8PtrTy(*Context);
   ModuleToEmit->setDataLayout(M.getDataLayout());
-  DummyInst = CastInst::Create(CastInst::ZExt, ConstantInt::get(I64Ty, 0), I64Ty);
 
   uint64_t GVOffset = 20480;
   FunctionType *MallocTy = nullptr;
@@ -345,9 +451,10 @@ void DepromoteRegisters::visitFunction(Function &F) {
     }
   }
 
-  if ((instCnt <= 13) && (TempRegCnt <= 16 - instCnt)) 
-    TempRegCnt = 16 - instCnt; // all values are permanent register users
-  else if (TempRegCnt < 8) 
+  //if ((instCnt <= 13) && (TempRegCnt <= 16 - instCnt)) 
+  //  TempRegCnt = 16 - instCnt; // all values are permanent register users
+  //else 
+  if (TempRegCnt < 8) 
     TempRegCnt = 8;
 
   /* initialize temporary register user tracker */
@@ -365,7 +472,12 @@ void DepromoteRegisters::visitFunction(Function &F) {
   for (auto *BB : BasicBlockBFS) 
     visit(*BB); 
 
+  /* resolve dependency issues introduced by temporary register system */
   resolveRegDependency();
+
+  /* clean-up unnecessary instructions created during depromotion */
+  removeExtraMemoryInsts();
+  cleanRedundantCasts();
 }
 
 void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
@@ -379,7 +491,7 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
     vector<pair<unsigned, Instruction *>> InstCount;
     for (auto *BB : BasicBlockBFS) {
       for (auto &I : *BB) {
-        if (!I.hasName() || dyn_cast<ZExtInst>(&I) || dyn_cast<PHINode>(&I)) 
+        if (!I.hasName() || dyn_cast<CastInst>(&I) ||  dyn_cast<PHINode>(&I))
             continue;
 
         auto SingleInstCount = make_pair(0, &I);
@@ -412,8 +524,12 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         if (RegToRegMap.count(&*I)) // don't assign for permanent users
           continue;
 
-        RegToAllocaMap[&*I] =
-          IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
+        if (dyn_cast<PHINode>(I))
+          RegToAllocaMap[&*I] =
+            IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_phi");
+        else
+          RegToAllocaMap[&*I] =
+            IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
       }
     }
 
@@ -515,22 +631,21 @@ void DepromoteRegisters::visitBinaryOperator(BinaryOperator &BO) {
   default: raiseError(BO); break;
   }
   
+  auto RegName = retrieveAssemblyRegister(&BO);
   auto *Op1 = translateSrcOperandToTgt(BO.getOperand(0), 1);
   auto *Op2 = translateSrcOperandToTgt(BO.getOperand(1), 2);
   auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, Ty,
-      retrieveAssemblyRegister(DummyInst) + "after_trunc__");
+                                RegName + "after_trunc__");
   auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, Ty,
       retrieveAssemblyRegister(nullptr) + "after_trunc__");
   
   Value *Res = nullptr;
   if (BO.getType() != I64Ty) {
-    string RegName = retrieveAssemblyRegister(&BO);
     Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
                                RegName + "before_zext__");
     Res = Builder->CreateZExt(Res, I64Ty, RegName);
   } else {
-    Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
-                    retrieveAssemblyRegister(&BO));
+    Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc, RegName);
   }
   saveInst(Res, &BO);
 }
@@ -540,42 +655,42 @@ void DepromoteRegisters::visitICmpInst(ICmpInst &II) {
   checkSrcType(II.getType());
   checkSrcType(OpTy);
   
+  auto RegName = retrieveAssemblyRegister(&II);
   auto *Op1 = translateSrcOperandToTgt(II.getOperand(0), 1);
   auto *Op2 = translateSrcOperandToTgt(II.getOperand(1), 2);
   auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, OpTy,
-      retrieveAssemblyRegister(DummyInst) + "after_trunc__");
+                                RegName + "after_trunc__");
   auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, OpTy,
       retrieveAssemblyRegister(nullptr) + "after_trunc__");
   
   // i1 -> i64 zext
-  string Reg = retrieveAssemblyRegister(&II);
-  string Reg_before_zext = Reg + "before_zext__";
+  string Reg_before_zext = RegName + "before_zext__";
   auto *Res = Builder->CreateZExt(
       Builder->CreateICmp(II.getPredicate(), Op1Trunc, Op2Trunc,
-      Reg_before_zext), I64Ty, Reg);
+      Reg_before_zext), I64Ty, RegName);
   saveInst(Res, &II);
 }
 
 void DepromoteRegisters::visitSelectInst(SelectInst &SI) {
+  auto RegName = retrieveAssemblyRegister(&SI);
   auto *Ty = SI.getType();
   auto *OpCond = translateSrcOperandToTgt(SI.getOperand(0), 1);
   assert(OpCond->getType() == I64Ty);
   // i64 -> i1 trunc
-  string R1Trunc = retrieveAssemblyRegister(nullptr) + "after_trunc__";
+  string R1Trunc = RegName + "after_trunc__";
   OpCond = Builder->CreateTrunc(OpCond, I1Ty, R1Trunc);
   
   auto *OpLeft = translateSrcOperandToTgt(SI.getOperand(1), 2);
   auto *OpRight = translateSrcOperandToTgt(SI.getOperand(2), 3);
-  auto *Res = Builder->CreateSelect(OpCond, OpLeft, OpRight, 
-                  retrieveAssemblyRegister(&SI));
+  auto *Res = Builder->CreateSelect(OpCond, OpLeft, OpRight, RegName);
   saveInst(Res, &SI);
 }
 
 void DepromoteRegisters::visitGetElementPtrInst(GetElementPtrInst &GEPI) {
   // Make it look like 'gep i8* ptr, i'
   auto *PtrOp = translateSrcOperandToTgt(GEPI.getPointerOperand(), 1);
-  auto *PtrI8Op = Builder->CreateBitCast(PtrOp, I8PtrTy,
-                              retrieveAssemblyRegister(DummyInst));
+  auto RegName = retrieveAssemblyRegister(&GEPI);
+  auto *PtrI8Op = Builder->CreateBitCast(PtrOp, I8PtrTy, RegName);
   unsigned Idx = 1;
   Type *CurrentPtrTy = GEPI.getPointerOperandType();
   
@@ -596,10 +711,8 @@ void DepromoteRegisters::visitGetElementPtrInst(GetElementPtrInst &GEPI) {
     if (auto *CI = dyn_cast<ConstantInt>(IdxValue))
       isZero = CI->getZExtValue() == 0;
 
-    if (!isZero) {
-      evictTempInst(DummyInst);
-      PtrI8Op = Builder->CreateGEP(PtrI8Op, IdxValue, retrieveAssemblyRegister(DummyInst));
-    }
+    if (!isZero)
+      PtrI8Op = Builder->CreateGEP(PtrI8Op, IdxValue, RegName);
 
     if (!ElemTy->isArrayTy()) {
       CurrentPtrTy = nullptr;
@@ -609,16 +722,39 @@ void DepromoteRegisters::visitGetElementPtrInst(GetElementPtrInst &GEPI) {
     ++Idx;
   }
 
-  PtrOp = Builder->CreateBitCast(PtrI8Op, GEPI.getType(),
-                    retrieveAssemblyRegister(&GEPI));
+  PtrOp = Builder->CreateBitCast(PtrI8Op, GEPI.getType(), RegName);
   saveInst(PtrOp, &GEPI);
 }
 
 // ---- Casts ----
+string DepromoteRegisters::retrieveCastInstRegister(CastInst *CI) {
+  auto *Op = CI->getOperand(0);
+  auto *OpI = dyn_cast<Instruction>(Op);
+
+  if (!OpI) 
+    return retrieveAssemblyRegister(CI);
+
+  for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr) {
+    auto *UserI = dyn_cast<Instruction>(itr->getUser());
+    if (!UserI || UserI == CI || UserI == OpI)
+      continue;
+    return retrieveAssemblyRegister(CI);
+  }
+
+  for (unsigned i = 0; i < TempRegCnt; i++) {
+      if (TempRegUsers[i].first != OpI) 
+        continue;
+      TempRegUsers[i].first = CI;
+      TempRegUsers[i].second.first = nullptr;
+      return assemblyRegisterName(TempRegUsers[i].second.second);
+  }
+  return retrieveAssemblyRegister(CI);
+}
+
 void DepromoteRegisters::visitBitCastInst(BitCastInst &BCI) {
   auto *Op = translateSrcOperandToTgt(BCI.getOperand(0), 1);
   auto *CastedOp = Builder->CreateBitCast(Op, BCI.getType(),
-            retrieveAssemblyRegister(&BCI));
+            retrieveCastInstRegister(&BCI));
   saveInst(CastedOp, &BCI);
 }
 
@@ -626,13 +762,17 @@ void DepromoteRegisters::visitSExtInst(SExtInst &SI) {
   // Get the sign bit.
   uint64_t bw = SI.getOperand(0)->getType()->getIntegerBitWidth();
   auto *Op = translateSrcOperandToTgt(SI.getOperand(0), 1);
+  auto RegName = retrieveAssemblyRegister(&SI);
   auto *AndVal =
-    Builder->CreateAnd(Op, (1llu << (bw - 1)), retrieveAssemblyRegister(nullptr));
+    Builder->CreateBinOp(Instruction::UDiv, Op, 
+      ConstantInt::get(I64Ty, 1llu << (bw - 1)), RegName);
+    //Builder->CreateAnd(Op, (1llu << (bw - 1)), RegName);
   auto *NegVal =
-    Builder->CreateSub(ConstantInt::get(I64Ty, 0), AndVal,
-                       retrieveAssemblyRegister(nullptr));
+    Builder->CreateBinOp(Instruction::Mul, AndVal, 
+      ConstantInt::get(I64Ty, 0llu - (1llu << (bw - 1))), RegName);
+    //Builder->CreateSub(ConstantInt::get(I64Ty, 0), AndVal, RegName);
   auto *ResVal =
-    Builder->CreateOr(NegVal, Op, retrieveAssemblyRegister(&SI));
+    Builder->CreateOr(NegVal, Op, RegName);
   saveInst(ResVal, &SI);
 }
 
@@ -642,20 +782,25 @@ void DepromoteRegisters::visitZExtInst(ZExtInst &ZI) {
 
 void DepromoteRegisters::visitTruncInst(TruncInst &TI) {
   auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
-  uint64_t Mask = (1llu << (TI.getDestTy()->getIntegerBitWidth())) - 1;
-  auto *Res = Builder->CreateAnd(Op, Mask, retrieveAssemblyRegister(&TI));
+  uint64_t Mask = 1llu << (TI.getDestTy()->getIntegerBitWidth());
+  Value *Res;
+  if (Mask == 0)
+    Res = Builder->CreateAnd(Op, Mask - 1, retrieveCastInstRegister(&TI));
+  else 
+    Res = Builder->CreateBinOp(Instruction::URem, Op, 
+      ConstantInt::get(I64Ty, Mask), retrieveCastInstRegister(&TI));
   saveInst(Res, &TI);
 }
 
 void DepromoteRegisters::visitPtrToIntInst(PtrToIntInst &PI) {
   auto *Op = translateSrcOperandToTgt(PI.getOperand(0), 1);
-  auto *Res = Builder->CreatePtrToInt(Op, I64Ty, retrieveAssemblyRegister(&PI));
+  auto *Res = Builder->CreatePtrToInt(Op, I64Ty, retrieveCastInstRegister(&PI));
   saveInst(Res, &PI);
 }
 
 void DepromoteRegisters::visitIntToPtrInst(IntToPtrInst &II) {
   auto *Op = translateSrcOperandToTgt(II.getOperand(0), 1);
-  auto *Res = Builder->CreateIntToPtr(Op, II.getType(), retrieveAssemblyRegister(&II));
+  auto *Res = Builder->CreateIntToPtr(Op, II.getType(), retrieveCastInstRegister(&II));
   saveInst(Res, &II);
 }
 
