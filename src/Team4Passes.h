@@ -82,6 +82,7 @@ private:
   map<Instruction *, unsigned> RegToRegMap;  // permanent register user to register number
   map<Instruction *, AllocaInst *> RegToAllocaMap;
   vector<pair<Instruction *, pair<Value *, unsigned>>> TempRegUsers; // temporary users
+  map<Instruction *, bool> Evictions;
 
   void raiseError(Instruction &I);
 
@@ -92,7 +93,7 @@ private:
 
   /* assembly allocation and management */
   string assemblyRegisterName(unsigned registerId);
-  string retrieveAssemblyRegister(Instruction *I);
+  string retrieveAssemblyRegister(Instruction *I, vector<Value*> *Ops = nullptr);
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId);
   void emitStoreToSrcRegister(Value *V, Instruction *I);
 
@@ -100,7 +101,7 @@ private:
   void saveInst(Value *Res, Instruction *I);
   void saveTempInst(Instruction *OldI, Value *Res);
   void evictTempInst(Instruction *I);
-  void getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS);
+  bool TraverseBlocksBFS(BasicBlock *StartBB, vector<BasicBlock *> *BasicBlockBFS = nullptr);
   
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId);
 
@@ -130,7 +131,6 @@ public:
   void visitGetElementPtrInst(GetElementPtrInst &GEPI);
 
   /* casts */
-  string retrieveCastInstRegister(CastInst *CI);
   void visitBitCastInst(BitCastInst &BCI);
   void visitSExtInst(SExtInst &SI);
   void visitZExtInst(ZExtInst &ZI);
