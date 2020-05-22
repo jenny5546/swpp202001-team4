@@ -491,8 +491,21 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
     vector<pair<unsigned, Instruction *>> InstCount;
     for (auto *BB : BasicBlockBFS) {
       for (auto &I : *BB) {
-        if (!I.hasName() || dyn_cast<CastInst>(&I) ||  dyn_cast<PHINode>(&I))
+        if (!I.hasName() || dyn_cast<CastInst>(&I))//||  dyn_cast<PHINode>(&I))
             continue;
+
+        if (auto *phi = dyn_cast<PHINode>(&I)) {
+          int canBePermanent = 1;
+          for (int i = 0, end = phi->getNumIncomingValues(); i < end; i++) {
+            if (isa<Constant>(phi->getIncomingValue(i))) { //|| //!phi->getIncomingValue(i)->getType()->isIntegerTy()) {
+              canBePermanent = 0;
+              break;
+            }
+          }
+          
+          if (!canBePermanent) 
+            continue;
+        }
 
         auto SingleInstCount = make_pair(0, &I);
         for (auto itr = (I).use_begin(), end = (I).use_end(); itr != end; ++itr) {
@@ -503,8 +516,32 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         InstCount.push_back(SingleInstCount);
       }
     }
-    sort(InstCount.begin(), InstCount.end()); 
+    std::sort(InstCount.begin(), InstCount.end()); 
     reverse(InstCount.begin(), InstCount.end()); // descending order
+
+    /* give phis more priority */
+    for (unsigned i = 0, sz = InstCount.size(); i < sz; i++) {
+      if (auto *phi = dyn_cast<PHINode>(InstCount[i].second)) {
+        auto *PHIInst = InstCount[i].second;
+        InstCount.erase(InstCount.begin() + i);
+        InstCount.insert(InstCount.begin(), make_pair(0, PHIInst));
+
+
+        for (auto itr = phi->use_begin(), end = phi->use_end(); itr != end; ++itr) {
+          auto *UsrI = dyn_cast<Instruction>(itr->getUser());
+            if (UsrI && isa<PHINode>(UsrI) && UsrI != PHIInst && UsrI->getParent() == PHIInst->getParent()) {
+              for (unsigned j = 0; j < sz; j++) {
+                if (InstCount[j].second == UsrI) {
+                  InstCount.erase(InstCount.begin());
+                }
+                sz = InstCount.size();
+              }
+            }
+        
+        }
+      }
+      sz = InstCount.size();
+    }
     
     /* assign permanent register users */
     for (unsigned i = 0, sz = InstCount.size(); i < 16 - TempRegCnt && i < sz; i++)
@@ -880,21 +917,58 @@ void DepromoteRegisters::processPHIsInSuccessor(BasicBlock *Succ, BasicBlock *BB
   //   br label %loop
   //
   // hence, all loads are done prior to any store instruction
-  vector<PHINode *> StoreToMake;
+  vector<PHINode *> RegCopyToMake, StoreToMake;
+
+ // outs() << Succ->getParent()->getName() << "\n\n";
   for (auto &PHI : Succ->phis()) {
     auto *V =
       translateSrcOperandToTgt(PHI.getIncomingValueForBlock(BBFrom), 1);
     checkTgtType(V->getType());
     assert(!isa<Instruction>(V) || !V->hasName() ||
            V->getName().startswith("__r"));
-    assert(RegToAllocaMap.count(&PHI));
-    StoreToMake.push_back(&PHI);
-    evictTempInst(&PHI);
+    if (RegToAllocaMap.count(&PHI)) {
+      StoreToMake.push_back(&PHI);
+      evictTempInst(&PHI);
+    } else {
+      assert(RegToRegMap.count(&PHI));
+      assert(!isa<ConstantInt>(V));
+      RegCopyToMake.push_back(&PHI);
+      
+    }
   }
   for (auto *PHI: StoreToMake)
     Builder->CreateStore(
         translateSrcOperandToTgt(
             PHI->getIncomingValueForBlock(BBFrom), 1), RegToAllocaMap[PHI]);
+
+  for (auto *PHI: RegCopyToMake) {
+      auto *V =
+        translateSrcOperandToTgt(PHI->getIncomingValueForBlock(BBFrom), 1);
+      auto RegName = retrieveAssemblyRegister(PHI);
+      if (V->getType()->isIntegerTy()) {
+        
+        Value *tempVal= Builder->CreateIntToPtr(V, I8PtrTy, RegName);
+   //     outs() << "Created " << *tempVal << "\n";
+        InstMap[PHI] = Builder->CreatePtrToInt(tempVal, V->getType(), RegName);
+
+      //  InstMap[&PHI] = Builder->CreateBinOp(Instruction::UDiv, V, ConstantInt::get(I64Ty, 1), RegName);
+ //       outs() << "Created " << *InstMap[&PHI] << "\n";
+      } else {
+
+
+
+//  auto *Res = 
+
+        Value *tempVal;
+    //    if (V->getType() == I8PtrTy)
+          tempVal= Builder->CreatePtrToInt(V, I64Ty, RegName);
+   //     else
+     //     tempVal = Builder->CreateBitCast(V, I8PtrTy, RegName);
+  //      outs() << "Created " << *tempVal << "\n";
+        InstMap[PHI] = Builder->CreateIntToPtr(tempVal, V->getType(), RegName);
+  //      outs() << "Created " << *InstMap[&PHI] << "\n";
+      }
+  }
 }
 
 // ---- Phi ----
