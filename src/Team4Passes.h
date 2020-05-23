@@ -69,6 +69,7 @@ private:
   BasicBlock *BBToEmit = nullptr;
   unique_ptr<IRBuilder<TargetFolder>> Builder;
   Function *MallocFn = nullptr;
+  Instruction *DummyInst;
   unsigned TempRegCnt;
 
   /* data for building depromoted module */
@@ -102,7 +103,7 @@ private:
   void saveInst(Value *Res, Instruction *I);
   void saveTempInst(Instruction *OldI, Value *Res);
   void evictTempInst(Instruction *I);
-  bool TraverseBlocksBFS(BasicBlock *StartBB, vector<BasicBlock *> *BasicBlockBFS = nullptr);
+  bool getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS);
   
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId);
 

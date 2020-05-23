@@ -60,6 +60,7 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
             return assemblyRegisterName(registerId);
         }
       }
+      delete Ops;
     }
 
     /* retrieve temporary register, and assign new if none */
@@ -116,6 +117,7 @@ void DepromoteRegisters::saveInst(Value *Res, Instruction *I) {
   if (RegToAllocaMap.count(I)) 
     ValToAllocaMap[Res] = RegToAllocaMap[I];
   saveTempInst(I, Res);
+  evictTempInst(DummyInst);
 }
 
 void DepromoteRegisters::saveTempInst(Instruction *OldI, Value *Res) {
@@ -139,25 +141,25 @@ void DepromoteRegisters::evictTempInst(Instruction *I) {
   }
 }
 
-bool DepromoteRegisters::TraverseBlocksBFS(BasicBlock *StartBB, vector<BasicBlock *> *BasicBlockBFS) {
+bool DepromoteRegisters::getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS) {
   /* get blocks in logical BFS order, from StartBB */
   /* additionally, return true if StartBB is in a loop */
-  bool isLoop = false;
+  BasicBlockBFS.clear();
   vector<BasicBlock *> BlockQueue;
-  BasicBlockBFS->clear();
   BlockQueue.push_back(StartBB);
+  bool isLoop = false;
 
   while (!BlockQueue.empty()) {
     BasicBlock *BB = BlockQueue.front();
     BlockQueue.erase(BlockQueue.begin());
 
-    if (find(BasicBlockBFS->begin(), BasicBlockBFS->end(), BB) != BasicBlockBFS->end()) {
+    if (find(BasicBlockBFS.begin(), BasicBlockBFS.end(), BB) != BasicBlockBFS.end()) {
       if (StartBB == BB)
         isLoop = true;
-        continue;
+      continue;
     }
 
-    BasicBlockBFS->push_back(BB);
+    BasicBlockBFS.push_back(BB);
     for (unsigned i = 0, cnt = BB->getTerminator()->getNumSuccessors(); i < cnt; i++)
       BlockQueue.push_back(BB->getTerminator()->getSuccessor(i));
   }
@@ -230,7 +232,7 @@ void DepromoteRegisters::resolveRegDependency() {
             continue;
 
           vector<BasicBlock *> Reachables;
-          TraverseBlocksBFS(SI->getParent(), &Reachables);
+          getBlockBFS(SI->getParent(), Reachables);
 
           for (BasicBlock *Reachable : Reachables) {
             if (Reachable != UsrI->getParent())
@@ -293,7 +295,7 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
         if (!SI->getPointerOperand()->getName().endswith("_slot") || !isa<Instruction>(SI->getValueOperand())) 
           continue;
         vector<BasicBlock *> Reachables;
-        TraverseBlocksBFS(SI->getParent(), &Reachables);
+        getBlockBFS(SI->getParent(), Reachables);
         InstsToRemove.insert(&I);
         for (auto itr = PtyOp->use_begin(), end = PtyOp->use_end(); itr != end; ++itr) {
           LoadInst *UsrI = dyn_cast<LoadInst>(itr->getUser());
@@ -305,10 +307,8 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
       PrevLI = nullptr;
     }
   }
-  for (auto *I : InstsToRemove) {
-    I->removeFromParent();
-    I->deleteValue();
-  }
+  for (auto *I : InstsToRemove)
+    I->eraseFromParent();
   if (!InstsToRemove.empty())
     removeExtraMemoryInsts();
 }
@@ -318,23 +318,17 @@ void DepromoteRegisters::cleanRedundantCasts() {
     for (auto &I: *BBMap[BB]) {
       if (auto *CI = dyn_cast<CastInst>(&I)) {
         auto *Op = CI->getOperand(0);
-        if (!dyn_cast<Instruction>(Op) || 
+        if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 ||
             Op->getName().str().find("arg") != string::npos ||
             Op->getName().str().find("before_zext__") != string::npos ||
-            CI->getName().str().find("after_trunc__") != string::npos ||
-            CI->getNumUses() != 1)
+            CI->getName().str().find("after_trunc__") != string::npos)
           continue;
-      
-        unsigned shouldCheck = 0;
-        for (auto &I: *CI->getParent()) {
-          if (&I == CI)
-            shouldCheck = 1;
-          else if (shouldCheck && (&I == dyn_cast<Instruction>(CI->use_begin()->getUser())))
+        for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
+          if (&*itr != CI) continue; 
+          if ((++itr != end && &*itr == CI->use_begin()->getUser()) ||
+              (++itr != end && &*itr == CI->use_begin()->getUser()))
             CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 6))));
-          else if (shouldCheck == 1)
-            shouldCheck++;
-          else if (shouldCheck > 1)
-            break;
+          break;
         }
       }
     }
@@ -439,7 +433,7 @@ void DepromoteRegisters::visitFunction(Function &F) {
     }
   }
 
-  if ((instCnt <= 10) && (TempRegCnt <= 16 - instCnt)) 
+  if ((instCnt <= 13) && (TempRegCnt <= 16 - instCnt)) 
     TempRegCnt = 16 - instCnt; // all values are permanent register users
   else if (TempRegCnt < 8) 
     TempRegCnt = 8;
@@ -449,7 +443,7 @@ void DepromoteRegisters::visitFunction(Function &F) {
   for (unsigned i = 0; i < TempRegCnt; i++) 
     TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
 
-  TraverseBlocksBFS(&F.getEntryBlock(), &BasicBlockBFS);
+  getBlockBFS(&F.getEntryBlock(), BasicBlockBFS);
   
   // Fill source BB -> target BB map.
   for (auto *BB : BasicBlockBFS) 
@@ -459,8 +453,9 @@ void DepromoteRegisters::visitFunction(Function &F) {
   for (auto *BB : BasicBlockBFS) 
     visit(*BB); 
 
-  resolveRegDependency(); /* resolve dependency issues introduced by temp reg system */
-  removeExtraMemoryInsts(); /* clean-up unnecessary insts created during depromotion */
+  /* resolve dependency issues, and clean-up unnecessarily created instructions */
+  resolveRegDependency();
+  removeExtraMemoryInsts(); 
   cleanRedundantCasts();
 }
 
@@ -478,11 +473,12 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         if (!I.hasName() || dyn_cast<CastInst>(&I)) // casts are usually for one-time use; make it temporary
             continue;
 
+        vector<BasicBlock *> temp;
         auto SingleInstCount = make_pair(0, &I);
         for (auto itr = (I).use_begin(), end = (I).use_end(); itr != end; ++itr) {
             if (auto *UserI = dyn_cast<Instruction>((*itr).getUser())) {
                 SingleInstCount.first++;
-                if (TraverseBlocksBFS(UserI->getParent(), new vector<BasicBlock *>())) 
+                if (getBlockBFS(UserI->getParent(), temp)) 
                   SingleInstCount.first += 2; // give more priority if it is used within loop
                 if (isa<PHINode>(&I)) 
                   SingleInstCount.first += 10; // give a lot of priority if instruction is phi value
@@ -582,17 +578,16 @@ void DepromoteRegisters::visitLoadInst(LoadInst &LI) {
   auto *LoadedTy = TgtPtrOp->getType()->getPointerElementType();
   Value *LoadedVal = nullptr;
   
-  vector<Value *> Ops = {LI.getPointerOperand()};
   if (LoadedTy->isIntegerTy() && LoadedTy->getIntegerBitWidth() < 64) {
     // Need to zext.
     // before_zext__ will be recognized by the assembler & merged with 64-bit
     // load to a smaller load.
-    string Reg = retrieveAssemblyRegister(&LI, &Ops);
+    string Reg = retrieveAssemblyRegister(&LI, new vector<Value *>{LI.getPointerOperand()});
     string RegBeforeZext = Reg + "before_zext__";
     LoadedVal = Builder->CreateLoad(TgtPtrOp, RegBeforeZext);
     LoadedVal = Builder->CreateZExt(LoadedVal, I64Ty, Reg);
   } else {
-    LoadedVal = Builder->CreateLoad(TgtPtrOp, retrieveAssemblyRegister(&LI, &Ops));
+    LoadedVal = Builder->CreateLoad(TgtPtrOp, retrieveAssemblyRegister(&LI, new vector<Value *>{LI.getPointerOperand()}));
   }
   checkTgtType(LoadedVal->getType());
   saveInst(LoadedVal, &LI);
@@ -642,7 +637,6 @@ void DepromoteRegisters::visitBinaryOperator(BinaryOperator &BO) {
   
   auto *Op1 = translateSrcOperandToTgt(BO.getOperand(0), 1);
   auto *Op2 = translateSrcOperandToTgt(BO.getOperand(1), 2);
-  vector<Value *> Ops = {BO.getOperand(0), BO.getOperand(1)};
   auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, Ty,
                       assemblyRegisterName(1) + "after_trunc__");
   auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, Ty,
@@ -650,13 +644,13 @@ void DepromoteRegisters::visitBinaryOperator(BinaryOperator &BO) {
   
   Value *Res = nullptr;
   if (BO.getType() != I64Ty) {
-    string RegName = retrieveAssemblyRegister(&BO, &Ops);
+    string RegName = retrieveAssemblyRegister(&BO, new vector<Value *>{BO.getOperand(0), BO.getOperand(1)});
     Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
                                RegName + "before_zext__");
     Res = Builder->CreateZExt(Res, I64Ty, RegName);
   } else {
     Res = Builder->CreateBinOp(BO.getOpcode(), Op1Trunc, Op2Trunc,
-                                retrieveAssemblyRegister(&BO, &Ops));
+          retrieveAssemblyRegister(&BO, new vector<Value *>{BO.getOperand(0), BO.getOperand(1)}));
   }
   saveInst(Res, &BO);
 }
@@ -668,14 +662,13 @@ void DepromoteRegisters::visitICmpInst(ICmpInst &II) {
   
   auto *Op1 = translateSrcOperandToTgt(II.getOperand(0), 1);
   auto *Op2 = translateSrcOperandToTgt(II.getOperand(1), 2);
-  vector<Value *> Ops = {II.getOperand(0), II.getOperand(1)};
-  auto Reg = retrieveAssemblyRegister(&II, &Ops);
   auto *Op1Trunc = Builder->CreateTruncOrBitCast(Op1, OpTy,
                     assemblyRegisterName(1) + "after_trunc__");
   auto *Op2Trunc = Builder->CreateTruncOrBitCast(Op2, OpTy,
                     assemblyRegisterName(2) + "after_trunc__");
   
   // i1 -> i64 zext
+  auto Reg = retrieveAssemblyRegister(&II, new vector<Value *>{II.getOperand(0), II.getOperand(1)});
   string Reg_before_zext = Reg + "before_zext__";
   auto *Res = Builder->CreateZExt(
       Builder->CreateICmp(II.getPredicate(), Op1Trunc, Op2Trunc,
@@ -693,17 +686,15 @@ void DepromoteRegisters::visitSelectInst(SelectInst &SI) {
   
   auto *OpLeft = translateSrcOperandToTgt(SI.getOperand(1), 2);
   auto *OpRight = translateSrcOperandToTgt(SI.getOperand(2), 3);
-  vector<Value *> Ops = {SI.getOperand(0), SI.getOperand(1), SI.getOperand(2)};
   auto *Res = Builder->CreateSelect(OpCond, OpLeft, OpRight, 
-                                          retrieveAssemblyRegister(&SI, &Ops));
+    retrieveAssemblyRegister(&SI, new vector<Value *>{SI.getOperand(0), SI.getOperand(1), SI.getOperand(2)}));
   saveInst(Res, &SI);
 }
 
 void DepromoteRegisters::visitGetElementPtrInst(GetElementPtrInst &GEPI) {
   // Make it look like 'gep i8* ptr, i'
   auto *PtrOp = translateSrcOperandToTgt(GEPI.getPointerOperand(), 1);
-  vector<Value *> Ops = {GEPI.getPointerOperand()};
-  auto RegName = retrieveAssemblyRegister(&GEPI, &Ops);
+  auto RegName = retrieveAssemblyRegister(&GEPI, new vector<Value *>{GEPI.getPointerOperand()});
   auto *PtrI8Op = Builder->CreateBitCast(PtrOp, I8PtrTy, RegName);
   unsigned Idx = 1;
   Type *CurrentPtrTy = GEPI.getPointerOperandType();
@@ -769,25 +760,21 @@ void DepromoteRegisters::visitZExtInst(ZExtInst &ZI) {
 
 void DepromoteRegisters::visitTruncInst(TruncInst &TI) {
   auto *Op = translateSrcOperandToTgt(TI.getOperand(0), 1);
-  vector<Value *> Ops = {TI.getOperand(0)};
-  auto RegName = retrieveAssemblyRegister(&TI, &Ops);
+  auto RegName = retrieveAssemblyRegister(&TI, new vector<Value *>{TI.getOperand(0)});
   uint64_t Mask = (1llu << (TI.getDestTy()->getIntegerBitWidth())) - 1;
-  Value *Res = Builder->CreateBinOp(Instruction::URem, Op, 
-                          ConstantInt::get(I64Ty, Mask + 1), RegName);
+  Value *Res = Builder->CreateBinOp(Instruction::URem, Op, ConstantInt::get(I64Ty, Mask + 1), RegName);
   saveInst(Res, &TI);
 }
 
 void DepromoteRegisters::visitPtrToIntInst(PtrToIntInst &PI) {
   auto *Op = translateSrcOperandToTgt(PI.getOperand(0), 1);
-  vector<Value *> Ops = {PI.getOperand(0)};
-  auto *Res = Builder->CreatePtrToInt(Op, I64Ty, retrieveAssemblyRegister(&PI, &Ops));
+  auto *Res = Builder->CreatePtrToInt(Op, I64Ty, retrieveAssemblyRegister(&PI, new vector<Value *>{PI.getOperand(0)}));
   saveInst(Res, &PI);
 }
 
 void DepromoteRegisters::visitIntToPtrInst(IntToPtrInst &II) {
   auto *Op = translateSrcOperandToTgt(II.getOperand(0), 1);
-  vector<Value *> Ops = {II.getOperand(0)};
-  auto *Res = Builder->CreateIntToPtr(Op, II.getType(), retrieveAssemblyRegister(&II, &Ops));
+  auto *Res = Builder->CreateIntToPtr(Op, II.getType(), retrieveAssemblyRegister(&II, new vector<Value *>{II.getOperand(0)}));
   saveInst(Res, &II);
 }
 
