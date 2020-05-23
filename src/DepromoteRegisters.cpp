@@ -48,13 +48,11 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
 
   if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
     if (Ops != nullptr) { /* attempt to use register name of operand */
-      for (auto itr = Ops->begin(), end = Ops->end(); itr != end; ++itr) {
-        auto *OpI = dyn_cast<Instruction>(*itr);
-        if (!OpI || !OpI->hasOneUse()) // must be an instruction that is only used here
+      for (auto *OpVal : *Ops) {
+        if (!isa<Instruction>(OpVal) || !OpVal->hasOneUse()) // must be an instruction that is only used here
           continue;
-
         for (unsigned i = 0; i < TempRegCnt; i++) {
-            if (TempRegUsers[i].first != OpI)
+            if (TempRegUsers[i].first != OpVal)
               continue;
             registerId = TempRegUsers[i].second.second;
             TempRegUsers.erase(TempRegUsers.begin() + i);
@@ -155,9 +153,9 @@ bool DepromoteRegisters::TraverseBlocksBFS(BasicBlock *StartBB, vector<BasicBloc
     BlockQueue.erase(BlockQueue.begin());
 
     if (CheckedBlocks.count(BB)) {
-        continue;
       if (StartBB == BB)
         isLoop = true;
+        continue;
     }
 
     CheckedBlocks[BB] = true;
@@ -225,7 +223,7 @@ void DepromoteRegisters::resolveRegDependency() {
         auto *OpI = dyn_cast<Instruction>(Op);
 
         if ((!SI->getPointerOperand()->getName().endswith("_slot") &&
-             !SI->getPointerOperand()->getName().endswith("_phi")) || !OpI || !Evictions.count(SI))
+             !SI->getPointerOperand()->getName().endswith("_phi")) || !Evictions.count(SI) || !OpI)
             continue;
 
         unsigned isStored = 0;
@@ -279,7 +277,6 @@ void DepromoteRegisters::resolveRegDependency() {
 void DepromoteRegisters::removeExtraMemoryInsts() { 
   /* remove unnecessary memory operations introduced from resolving dependencies */
   std::set<Instruction *> InstsToRemove;
-
   for (auto *BB : BasicBlockBFS) {
     LoadInst *PrevLI = nullptr;
     for (auto &I : *BBMap[BB]) {
@@ -304,7 +301,6 @@ void DepromoteRegisters::removeExtraMemoryInsts() {
           continue;
         vector<BasicBlock *> Reachables;
         TraverseBlocksBFS(SI->getParent(), &Reachables);
-
         InstsToRemove.insert(&I);
         unsigned isSelfChecked = 0;
         for (BasicBlock *Reachable : Reachables) {
@@ -466,7 +462,6 @@ void DepromoteRegisters::visitFunction(Function &F) {
   TempRegUsers.clear();
   for (unsigned i = 0; i < TempRegCnt; i++) 
     TempRegUsers.push_back(make_pair(nullptr, make_pair(nullptr, i + 1)));
-  Evictions.clear();
 
   TraverseBlocksBFS(&F.getEntryBlock(), &BasicBlockBFS);
   
@@ -494,51 +489,46 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
     vector<pair<unsigned, Instruction *>> InstCount;
     for (auto *BB : BasicBlockBFS) {
       for (auto &I : *BB) {
-        if (!I.hasName() || dyn_cast<CastInst>(&I))
+        if (!I.hasName() || dyn_cast<CastInst>(&I)) // casts are usually for one-time use; make it temporary
             continue;
 
         auto SingleInstCount = make_pair(0, &I);
         for (auto itr = (I).use_begin(), end = (I).use_end(); itr != end; ++itr) {
-          if (auto *UserI = dyn_cast<Instruction>((*itr).getUser())) {
-            SingleInstCount.first++;
-            if (TraverseBlocksBFS(UserI->getParent()))
-              SingleInstCount.first += 2;
-          }
+            if (auto *UserI = dyn_cast<Instruction>((*itr).getUser())) {
+                SingleInstCount.first++;
+                if (TraverseBlocksBFS(UserI->getParent())) // give more priority if it is used within loop
+                  SingleInstCount.first += 2;
+                if (isa<PHINode>(&I)) // give a lot of priority if instruction is phi value
+                  SingleInstCount.first += 10;
+            }
         }
 
         InstCount.push_back(SingleInstCount);
-        if (auto *phi = dyn_cast<PHINode>(&I)) {
-          for (unsigned i = 0, end = phi->getNumIncomingValues(); i < end; i++) {
-            if (isa<Constant>(phi->getIncomingValue(i))) {
-              InstCount.pop_back();
-              break;
-            }
-          }
-        }
       }
     }
     std::sort(InstCount.begin(), InstCount.end()); 
-    std::reverse(InstCount.begin(), InstCount.end()); // descending order
 
-    /* give phis more priority */
+    /* if phi uses constant, or is dependent on other phi on same block, must be put on stack */
     for (unsigned i = 0, sz = InstCount.size(); i < sz; i++) {
+      int shouldErase = 0;
       if (auto *phi = dyn_cast<PHINode>(InstCount[i].second)) {
-        auto *PHIInst = InstCount[i].second;
-        InstCount.erase(InstCount.begin() + i);
-        InstCount.insert(InstCount.begin(), make_pair(0, PHIInst));
-        // However, if two PHIs are depedent on each other, they must be saved on stack
+        for (unsigned j = 0, end = phi->getNumIncomingValues(); j < end; j++)
+          if (isa<Constant>(phi->getIncomingValue(j)))
+            shouldErase = 1;
         for (auto itr = phi->use_begin(), end = phi->use_end(); itr != end; ++itr) {
           auto *UsrI = dyn_cast<Instruction>(itr->getUser());
-          if (isa<PHINode>(UsrI) && UsrI->getParent() == PHIInst->getParent()) {
-            for (unsigned j = 0; j < sz; j++) {
+          if (isa<PHINode>(UsrI) && UsrI->getParent() == phi->getParent()) {
+            for (unsigned j = 0; j < sz; j++)
               if (InstCount[j].second == UsrI)
-                InstCount.erase(InstCount.begin());
-              sz = InstCount.size();
-            }
+                shouldErase = 1;
           }
         }
       }
+      if (shouldErase)                            // deletion has to be done within iteration 
+        InstCount.erase(InstCount.begin() + i--); // so that only either of dependent phis 
+      sz = InstCount.size();                      // are deleted, not both
     }
+    reverse(InstCount.begin(), InstCount.end()); // descending order
     
     /* assign permanent register users */
     for (unsigned i = 0, sz = InstCount.size(); i < 16 - TempRegCnt && i < sz; i++)
@@ -558,12 +548,10 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         if (RegToRegMap.count(&*I)) // don't assign for permanent users
           continue;
 
-        if (dyn_cast<PHINode>(I))
-          RegToAllocaMap[&*I] =
-            IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_phi");
-        else
-          RegToAllocaMap[&*I] =
-            IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
+        RegToAllocaMap[&*I] =
+          IB.CreateAlloca(SrcToTgtType(Ty), nullptr, I->getName() + "_slot");
+        if (dyn_cast<PHINode>(I)) // phis will be handled differently later when removing extra load/stores
+          RegToAllocaMap[&*I]->setName(RegToAllocaMap[&*I]->getName() + "_phi");
       }
     }
 
