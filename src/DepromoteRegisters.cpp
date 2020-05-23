@@ -140,27 +140,24 @@ void DepromoteRegisters::evictTempInst(Instruction *I) {
 }
 
 bool DepromoteRegisters::TraverseBlocksBFS(BasicBlock *StartBB, vector<BasicBlock *> *BasicBlockBFS) {
-  /* get blocks in logical BFS order, from StartBB; additionally, return true if StartBB is in a loop */
+  /* get blocks in logical BFS order, from StartBB */
+  /* additionally, return true if StartBB is in a loop */
   bool isLoop = false;
-  map<BasicBlock *, bool> CheckedBlocks;
   vector<BasicBlock *> BlockQueue;
-  if (BasicBlockBFS != nullptr)
-    BasicBlockBFS->clear();
+  BasicBlockBFS->clear();
   BlockQueue.push_back(StartBB);
 
   while (!BlockQueue.empty()) {
     BasicBlock *BB = BlockQueue.front();
     BlockQueue.erase(BlockQueue.begin());
 
-    if (CheckedBlocks.count(BB)) {
+    if (find(BasicBlockBFS->begin(), BasicBlockBFS->end(), BB) != BasicBlockBFS->end()) {
       if (StartBB == BB)
         isLoop = true;
         continue;
     }
 
-    CheckedBlocks[BB] = true;
-    if (BasicBlockBFS != nullptr)
-      BasicBlockBFS->push_back(BB);
+    BasicBlockBFS->push_back(BB);
     for (unsigned i = 0, cnt = BB->getTerminator()->getNumSuccessors(); i < cnt; i++)
       BlockQueue.push_back(BB->getTerminator()->getSuccessor(i));
   }
@@ -274,8 +271,8 @@ void DepromoteRegisters::resolveRegDependency() {
   }
 }
 
-void DepromoteRegisters::removeExtraMemoryInsts() { 
-  /* remove unnecessary memory operations introduced from resolving dependencies */
+void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary memory operations
+  OrderedInstructions OI(new DominatorTree(*FuncToEmit)); // introduced from resolving dependencies
   std::set<Instruction *> InstsToRemove;
   for (auto *BB : BasicBlockBFS) {
     LoadInst *PrevLI = nullptr;
@@ -284,16 +281,12 @@ void DepromoteRegisters::removeExtraMemoryInsts() {
         InstsToRemove.insert(&I);
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
         if (I.hasOneUse() && isa<StoreInst>(I.use_begin()->getUser()) && 
-            dyn_cast<StoreInst>(I.use_begin()->getUser())->getPointerOperand() == LI->getPointerOperand()) {
-          InstsToRemove.insert(dyn_cast<Instruction>(I.use_begin()->getUser())); 
-          continue; // after store is deleted, loads will be deleted on next resursive call
-        }
+            dyn_cast<StoreInst>(I.use_begin()->getUser())->getPointerOperand() == LI->getPointerOperand())
+          InstsToRemove.insert(dyn_cast<Instruction>(I.use_begin()->getUser()));
         if (PrevLI != nullptr && PrevLI->getPointerOperand() == LI->getPointerOperand() &&
-            PrevLI->getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) {
-          InstsToRemove.insert(&I);
+            PrevLI->getName().str().substr(0, 6) == LI->getName().str().substr(0, 6))
           PrevLI->replaceAllUsesWith(LI);
-        }
-        PrevLI = LI;
+        PrevLI = LI; // load will be deleted on condition use_empty() on next resursive call
         continue;
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
         auto *PtyOp = ValToAllocaMap[SI->getValueOperand()];
@@ -302,29 +295,22 @@ void DepromoteRegisters::removeExtraMemoryInsts() {
         vector<BasicBlock *> Reachables;
         TraverseBlocksBFS(SI->getParent(), &Reachables);
         InstsToRemove.insert(&I);
-        unsigned isSelfChecked = 0;
-        for (BasicBlock *Reachable : Reachables) {
-          for (auto &RI : *Reachable) {
-            if (Reachable == SI->getParent() && !isSelfChecked) {
-              if (&RI == SI)
-                isSelfChecked = 1;
-              continue;
-            }
-            if (isa<LoadInst>(&RI) && dyn_cast<LoadInst>(&RI)->getPointerOperand() == PtyOp)
-              InstsToRemove.erase(&I);
-          }
+        for (auto itr = PtyOp->use_begin(), end = PtyOp->use_end(); itr != end; ++itr) {
+          LoadInst *UsrI = dyn_cast<LoadInst>(itr->getUser());
+          if (UsrI && find(Reachables.begin(), Reachables.end(), UsrI->getParent()) != Reachables.end() &&
+              ((UsrI->getParent() == SI->getParent() && OI.dfsBefore(SI, UsrI)) || (UsrI->getParent() != SI->getParent())))
+            InstsToRemove.erase(&I);
         }
       }
       PrevLI = nullptr;
     }
   }
-  if (InstsToRemove.empty())
-    return;
   for (auto *I : InstsToRemove) {
     I->removeFromParent();
     I->deleteValue();
   }
-  removeExtraMemoryInsts();
+  if (!InstsToRemove.empty())
+    removeExtraMemoryInsts();
 }
 
 void DepromoteRegisters::cleanRedundantCasts() {
@@ -496,10 +482,10 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         for (auto itr = (I).use_begin(), end = (I).use_end(); itr != end; ++itr) {
             if (auto *UserI = dyn_cast<Instruction>((*itr).getUser())) {
                 SingleInstCount.first++;
-                if (TraverseBlocksBFS(UserI->getParent())) // give more priority if it is used within loop
-                  SingleInstCount.first += 2;
-                if (isa<PHINode>(&I)) // give a lot of priority if instruction is phi value
-                  SingleInstCount.first += 10;
+                if (TraverseBlocksBFS(UserI->getParent(), new vector<BasicBlock *>())) 
+                  SingleInstCount.first += 2; // give more priority if it is used within loop
+                if (isa<PHINode>(&I)) 
+                  SingleInstCount.first += 10; // give a lot of priority if instruction is phi value
             }
         }
 
