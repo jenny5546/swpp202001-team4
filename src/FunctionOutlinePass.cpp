@@ -10,6 +10,9 @@
 
 ********************************************/ 
 
+/* Check if an instruction is defined in a different block, 
+   If so, it needs to be a outlined func arg */
+
 bool FunctionOutlinePass::isOutlinedArgs(const BasicBlock *Block, Value *V) {
       
       if (isa<Argument>(V)) return true;
@@ -19,6 +22,10 @@ bool FunctionOutlinePass::isOutlinedArgs(const BasicBlock *Block, Value *V) {
       return false;
 
 }
+
+/* Helper func to count how many function arguments 
+is needed to outline the block (so that it does not exceed 16) */
+
 unsigned FunctionOutlinePass::countOutlinedArgs(BasicBlock *Block, vector<Value *> funcArgs) {
       
       unsigned countArgs=0;
@@ -42,11 +49,12 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
 
         SmallVector<BasicBlock *, 16> BBs;
         vector<Value *> funcArgs;
-        // Get Function arguments and put them in a vector
+
+        // Get Function arguments and save them in a vector
         for (auto *itr = F.arg_begin(), *end = F.arg_end(); itr != end; ++itr)
             funcArgs.push_back(&*itr);
 
-        int regsInFunc = 0;
+        unsigned regsInFunc = 0;
         unsigned numOfBlocks = 0;
 
         for (auto &BB : F) {
@@ -56,11 +64,11 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
         for (auto &BB : F ) {
 
             bool splitBlockFlag = false;
-            int regsInBlock = 0;
-            int instInBlock = 0;
-            int totalInsts = 0;
+            unsigned regsInBlock = 0;
+            unsigned instInBlock = 0;
+            unsigned totalInsts = 0;
             Instruction *pointToInsert;
-            int point;
+            unsigned point;
             
             for (auto &I : BB){
                 /* 
@@ -81,7 +89,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     splitBlockFlag = true;
                 } 
             }
-            // 1. 한 block이 너무 크면 쪼개버렷
+            /* [Case 1] Split a single big block into pieces */
 
             if (splitBlockFlag){
 
@@ -93,6 +101,8 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 succ = SplitBlock(&BB, pointToInsert); // split block 을 안하넹 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 // outs()<<"pointtoinsert is "<<pointToInsert->getName()<<"next is "<<pointToInsert->getNextNode()->getName()<<"\n";
+                
+                /* Is unsafe to split, outlines to func args with more than 10 args */
 
                 if (countArgs>=11){
                     outs()<<"count is "<<countArgs<<"\n";
@@ -113,12 +123,10 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     }
                     
                 }
+                /* Is safe to split */
                 else{
                     canSplit= true;
                 }
-                // BB.getTerminator()->eraseFromParent();
-                // IRBuilder<> builder(&BB);
-                // builder.CreateBr(succ);
 
                 if (canSplit){
                     CodeExtractorAnalysisCache CEAC(F);
@@ -130,7 +138,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 }
             }
 
-            // 2. 함수 안에 여러 Block이 있을 경우, 전에 block이 너무 많이 썼으면 다음엔 보내버렷
+            /* [Case 2] Split whole blocks if the function uses a lot of regs */
 
             if (regsInFunc > 13 && numOfBlocks>1 && regsInBlock>3 && !splitBlockFlag){ 
                 // outs() << "BlockExtractor: Extracting "
@@ -141,16 +149,15 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     BBs.push_back(II->getUnwindDest());
             }
         }
-
         for (auto BB : BBs){
+
+            /* Is safe to split */
             if (countOutlinedArgs(BB, funcArgs)<=10){
                 CodeExtractorAnalysisCache CEAC(F);
                 CodeExtractor(BB).extractCodeRegion(CEAC);
             }
-
-            // Making sure outlining whole blocks also does not make functions with over 16 func args
+            /* Is unsafe to split, outlines to func args with more than 10 args */
             else {
-
                 unsigned instsInBlock;
                 unsigned splitPoint=1;
                 Instruction *pointToInsert;
@@ -169,7 +176,8 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 bool canSplit = false;
 
-                // 그 block에 몇 개 의 instruction이 있는지 셌으니 10개이상의 param이 필요한 애이면, 또쪼개서.. loop
+                /* Find split the block to another block, so that 
+                the outlined func does not exceed 10 func args */
                 if (countArgs>=11){
                     outs()<<"count is "<<countArgs<<"\n";
 
@@ -192,9 +200,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 else{
                     canSplit= true;
                 }
-                // BB.getTerminator()->eraseFromParent();
-                // IRBuilder<> builder(&BB);
-                // builder.CreateBr(succ);
 
                 if (canSplit){
                     CodeExtractorAnalysisCache CEAC(F);
@@ -207,7 +212,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
 
             }
         }
-        
         vector <Instruction*> callInstsToErase;
         /* 
             Erase the llvm.lifetime.start, llvm.lifetime.end global function calls manually 
@@ -232,7 +236,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
             Erase calls to functions that do nothing (funcs that ret 0 and terminate)
             This will reduce the costs of calling these useless functions.
         */
-
         for (auto &BB : F) {
             for (auto &I: BB){
                 if (auto *CI = dyn_cast<CallInst>(&I)){
@@ -258,18 +261,13 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                             outs()<<calledfunc->getName()<<"\n";
                             callInstsToErase.push_back(&I);
                         }
-
                     }
-                    
-                    
                 }
             }
         }   
-
         for (auto I : callInstsToErase){
             I->eraseFromParent();
         }    
-
     }
 
     return PreservedAnalyses::all();
