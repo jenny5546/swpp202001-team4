@@ -92,7 +92,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 // succ = BB.splitBasicBlock(pointToInsert, "outline");
                 succ = SplitBlock(&BB, pointToInsert); // split block 을 안하넹 
                 countArgs = countOutlinedArgs(succ, funcArgs);
-                // outs()<<"pointtoinsert is "<<pointToInsert->getName()<<"next is "<<pointToInsert->getNextNode()->getName()<<"fuck\n";
+                // outs()<<"pointtoinsert is "<<pointToInsert->getName()<<"next is "<<pointToInsert->getNextNode()->getName()<<"\n";
 
                 if (countArgs>=11){
                     outs()<<"count is "<<countArgs<<"\n";
@@ -146,16 +146,66 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
             if (countOutlinedArgs(BB, funcArgs)<=10){
                 CodeExtractorAnalysisCache CEAC(F);
                 CodeExtractor(BB).extractCodeRegion(CEAC);
-            } 
-            // else {
-            //     unsigned instsInBlock;
-            //     unsigned splitPoint=1;
-            //     for (auto &I : *BB){
-            //         instsInBlock++;
-            //     }
-            //     // 그 block에 몇 개 의 instruction이 있는지 셌으니 10개이상의 param이 필요한 애이면, 또쪼개서.. loop
+            }
 
-            // }
+            // Making sure outlining whole blocks also does not make functions with over 16 func args
+            else {
+
+                unsigned instsInBlock;
+                unsigned splitPoint=1;
+                Instruction *pointToInsert;
+                unsigned countArgs=0;
+
+                for (auto &I : *BB){
+                    instsInBlock++;
+                }
+                // Get First instruction of the block
+                for (auto &I : *BB){
+                    pointToInsert = &I;
+                    break;
+                }
+
+                BasicBlock *succ= SplitBlock(BB, pointToInsert); 
+                countArgs = countOutlinedArgs(succ, funcArgs);
+                bool canSplit = false;
+
+                // 그 block에 몇 개 의 instruction이 있는지 셌으니 10개이상의 param이 필요한 애이면, 또쪼개서.. loop
+                if (countArgs>=11){
+                    outs()<<"count is "<<countArgs<<"\n";
+
+                    while(instsInBlock-splitPoint>3){
+
+                        pointToInsert = pointToInsert->getNextNode();
+                        MergeBlockIntoPredecessor(succ);
+                        succ = SplitBlock(BB, pointToInsert); 
+                        countArgs = countOutlinedArgs(succ, funcArgs);
+                        splitPoint++;
+                        outs()<<"(inside loop) count is "<<countArgs<<"\n";
+                        if (countArgs<11){
+                            outs()<<"split\n";
+                            canSplit= true;
+                            break;
+                        }
+                    }
+                    
+                }
+                else{
+                    canSplit= true;
+                }
+                // BB.getTerminator()->eraseFromParent();
+                // IRBuilder<> builder(&BB);
+                // builder.CreateBr(succ);
+
+                if (canSplit){
+                    CodeExtractorAnalysisCache CEAC(F);
+                    Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
+                    outs()<<"Splitting 완료\n";
+                }
+                else{
+                    outs()<<"This block cannot be outlined\n";
+                }
+
+            }
         }
         
         vector <Instruction*> callInstsToErase;
