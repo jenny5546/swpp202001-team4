@@ -10,9 +10,6 @@
 
 ********************************************/ 
 
-/* Check if an instruction is defined in a different block, 
-   If so, it needs to be a outlined func arg */
-
 bool FunctionOutlinePass::isOutlinedArgs(const BasicBlock *Block, Value *V) {
       
       if (isa<Argument>(V)) return true;
@@ -22,10 +19,6 @@ bool FunctionOutlinePass::isOutlinedArgs(const BasicBlock *Block, Value *V) {
       return false;
 
 }
-
-/* Helper func to count how many function arguments 
-is needed to outline the block (so that it does not exceed 16) */
-
 unsigned FunctionOutlinePass::countOutlinedArgs(BasicBlock *Block, vector<Value *> funcArgs) {
       
       unsigned countArgs=0;
@@ -53,16 +46,12 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
         // Get Function arguments and save them in a vector
         for (auto *itr = F.arg_begin(), *end = F.arg_end(); itr != end; ++itr)
             funcArgs.push_back(&*itr);
-
         unsigned regsInFunc = 0;
         unsigned numOfBlocks = 0;
-
         for (auto &BB : F) {
             numOfBlocks++;
         }
-
         for (auto &BB : F ) {
-
             bool splitBlockFlag = false;
             unsigned regsInBlock = 0;
             unsigned instInBlock = 0;
@@ -97,10 +86,8 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 unsigned countArgs=0;
                 bool canSplit = false;
                 outs()<<point<<"\n";
-                // succ = BB.splitBasicBlock(pointToInsert, "outline");
-                succ = SplitBlock(&BB, pointToInsert); // split block 을 안하넹 
+                succ = SplitBlock(&BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
-                // outs()<<"pointtoinsert is "<<pointToInsert->getName()<<"next is "<<pointToInsert->getNextNode()->getName()<<"\n";
                 
                 /* Is unsafe to split, outlines to func args with more than 10 args */
 
@@ -127,7 +114,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 else{
                     canSplit= true;
                 }
-
                 if (canSplit){
                     CodeExtractorAnalysisCache CEAC(F);
                     Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
@@ -137,20 +123,14 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     outs()<<"This block cannot be outlined\n";
                 }
             }
-
             /* [Case 2] Split whole blocks if the function uses a lot of regs */
-
             if (regsInFunc > 13 && numOfBlocks>1 && regsInBlock>3 && !splitBlockFlag){ 
-                // outs() << "BlockExtractor: Extracting "
-                //                     << BB.getParent()->getName() << ":" << BB.getName()
-                //                     << "\n";
                 BBs.push_back(&BB);
                 if (const InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator()))
                     BBs.push_back(II->getUnwindDest());
             }
         }
         for (auto BB : BBs){
-
             /* Is safe to split */
             if (countOutlinedArgs(BB, funcArgs)<=10){
                 CodeExtractorAnalysisCache CEAC(F);
@@ -162,7 +142,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 unsigned splitPoint=1;
                 Instruction *pointToInsert;
                 unsigned countArgs=0;
-
                 for (auto &I : *BB){
                     instsInBlock++;
                 }
@@ -171,11 +150,9 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     pointToInsert = &I;
                     break;
                 }
-
                 BasicBlock *succ= SplitBlock(BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 bool canSplit = false;
-
                 /* Find split the block to another block, so that 
                 the outlined func does not exceed 10 func args */
                 if (countArgs>=11){
@@ -209,7 +186,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 else{
                     outs()<<"This block cannot be outlined\n";
                 }
-
             }
         }
         vector <Instruction*> callInstsToErase;
@@ -247,7 +223,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                             break;
                         }
                     }
-                    // if (isOutlinedFunc) outs()<<calledfunc->getName()<<"is outlined func\n";
                     if (isOutlinedFunc && !CI->hasName()){
                         bool somethingElse = false;
                         for (auto &block : *calledfunc){
