@@ -81,21 +81,16 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
             /* [Case 1] Split a single big block into pieces */
 
             if (splitBlockFlag){
-
                 BasicBlock *succ;
                 unsigned countArgs=0;
                 bool canSplit = false;
                 outs()<<point<<"\n";
                 succ = SplitBlock(&BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
-                
                 /* Is unsafe to split, outlines to func args with more than 10 args */
-
                 if (countArgs>=11){
                     outs()<<"count is "<<countArgs<<"\n";
-
                     while(totalInsts-point>3){
-
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
                         succ = SplitBlock(&BB, pointToInsert); 
@@ -157,9 +152,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 the outlined func does not exceed 10 func args */
                 if (countArgs>=11){
                     outs()<<"count is "<<countArgs<<"\n";
-
                     while(instsInBlock-splitPoint>3){
-
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
                         succ = SplitBlock(BB, pointToInsert); 
@@ -177,7 +170,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 else{
                     canSplit= true;
                 }
-
                 if (canSplit){
                     CodeExtractorAnalysisCache CEAC(F);
                     Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
