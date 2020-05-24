@@ -1,6 +1,11 @@
 #include "SimpleBackend.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/Use.h"
+#include "llvm/Support/Casting.h"
 
 #include <regex>
 #include <set>
@@ -166,7 +171,13 @@ class AssemblyEmitterImpl : public InstVisitor<AssemblyEmitterImpl> {
 public:
   vector<string> FnBody;
   StackFrame CurrentStackFrame;
-
+  // Instruction pointer vector for Memory Instructions (Malloc, Alloca, Global Variables)
+  vector<Instruction *> MemAllocation;
+  /* a boolean variable to check if the memory access has changed from before
+     if an instruction accesses heap (malloc and global variable) accessHeap will be true, 
+     if an instruction accesses stack (alloca) accessHeap will be false */
+  bool accessHeap;
+  
 private:
   // ----- Emit functions -----
   void _emitAssemblyBody(const string &Cmd, const vector<string> &Ops,
@@ -197,6 +208,11 @@ private:
 
   void emitBasicBlockStart(const string &name) {
     FnBody.push_back(name + ":");
+  }
+
+  /* emit reset instruction */
+  void emitReset(const string &loc){
+    FnBody.push_back("reset " + loc);
   }
 
   // If V is a register or constant, return its name.
@@ -264,8 +280,11 @@ public:
     FnBody.clear();
   }
 
-  void visitBasicBlock(BasicBlock &BB) {
+  void visitBasicBlock(BasicBlock &BB) { 
     raiseErrorIf(!BB.hasName(), "This basic block does not have name: ", &BB);
+    /* since we only look for the changes of the memory access within the same block, 
+       we initialize accessHeap to false for every basicblock */ 
+    accessHeap = false;
     emitBasicBlockStart(BB.getName().str());
   }
 
@@ -280,6 +299,8 @@ public:
   // ---- Memory operations ----
   void visitAllocaInst(AllocaInst &I) {
     CurrentStackFrame.addAlloca(&I);
+    // put alloca inst in the MemAllocation vector
+    MemAllocation.push_back(&I);
 
     if (shouldBeMappedToAssemblyRegister(&I)) {
       // I is: __r1__ = alloca i32
@@ -291,26 +312,111 @@ public:
     }
   }
   void visitLoadInst(LoadInst &LI) {
+    /* store previous memory access info in the variable 'prev'
+       if this load inst accesses stack -> accessHeap = false,
+       if this load inst accesses heap -> accessHeap = true
+       if the value of accessHeap changes from the prev, emit reset  */
+    bool prev = accessHeap;
+    string loc;
+    if(isa<IntToPtrInst>(LI.getPointerOperand())){
+      accessHeap = true;
+      loc = "heap";
+    }
+    for(Instruction* I: MemAllocation){
+      CallInst *CI = dyn_cast<CallInst>(I);
+      AllocaInst *AI = dyn_cast<AllocaInst>(I);
+      BitCastInst *BCI = dyn_cast<BitCastInst>(I);
+      
+      if(CI && (CI == GetUnderlyingObject(LI.getPointerOperand(),CI->getParent()->getParent()->getParent()->getDataLayout()))){
+              accessHeap = true;
+              loc = "heap";      
+      }
+      // if(CallInst *CI = dyn_cast<CallInst>(I)){
+      //   for(auto U : I -> users()){
+      //     if(LoadInst *li = dyn_cast<LoadInst>(U)){
+      //       if(li == &LI){
+      //         accessHeap = true;
+      //         loc = "heap";
+      //         //emitReset(loc);
+      //       }
+      //     }
+      //   }
+      // }
+      if(AI) {
+        for(auto U : I -> users()){
+          if(LoadInst *li = dyn_cast<LoadInst>(U)){
+            if(li == &LI){
+              accessHeap = false;
+              loc = "stack";
+            }
+          }
+        }
+      }
+    }
+    if(prev != accessHeap) emitReset(loc);
     auto [PtrOp, StackOffset] = getOperand(LI.getPointerOperand(), false);
     string Dest = getRegisterNameFromInstruction(&LI, true);
     string sz = getAccessSizeInStr(LI.getType());
 
-    if (StackOffset != -1)
-      // load stack
+    if (StackOffset != -1){
       emitAssembly(Dest, "load", {sz, "sp", std::to_string(StackOffset)});
+    }
     else
       emitAssembly(Dest, "load", {sz, PtrOp, "0"});
   }
+
+
   void visitStoreInst(StoreInst &SI) {
+    /* memory access change detection has the same logic as visitLoadInst */
+    bool prev = accessHeap;
+    string loc;
+    if(isa<IntToPtrInst>(SI.getPointerOperand())){
+      accessHeap = true;
+      loc = "heap";
+    }    
+    for(Instruction* I: MemAllocation){
+      CallInst *CI = dyn_cast<CallInst>(I);
+      AllocaInst *AI = dyn_cast<AllocaInst>(I);      
+      if(CI && (CI == GetUnderlyingObject(SI.getPointerOperand(),CI->getParent()->getParent()->getParent()->getDataLayout()))){
+              accessHeap = true;
+              loc = "heap";      
+      }
+      // if(CallInst *CI = dyn_cast<CallInst>(I)){
+      //   for(auto U : I -> users()){
+      //     if(StoreInst *si = dyn_cast<StoreInst>(U)){
+      //       if(si == &SI){
+      //         accessHeap = true;
+      //         loc = "heap";
+      //         //emitReset(loc);              
+      //       }
+      //     }
+      //   }
+      // }
+      if(AI) {
+        for(auto U : I -> users()){
+          if(StoreInst *si = dyn_cast<StoreInst>(U)){
+            if(si == &SI){
+              accessHeap = false;
+              loc = "stack";
+            }
+          }
+
+        }
+      }
+    }
+    if(prev != accessHeap) emitReset(loc);
     auto [ValOp, _] = getOperand(SI.getValueOperand(), true);
     auto [PtrOp, StackOffset] = getOperand(SI.getPointerOperand(), false);
     string sz = getAccessSizeInStr(SI.getValueOperand()->getType());
 
-    if (StackOffset != -1)
+    if (StackOffset != -1){
       emitAssembly("store", {sz, ValOp, "sp", std::to_string(StackOffset)});
+    }
     else
       emitAssembly("store", {sz, ValOp, PtrOp, "0"});
   }
+
+  
 
   // ---- Arithmetic operations ----
   void visitBinaryOperator(BinaryOperator &BO) {
@@ -389,7 +495,7 @@ public:
     if (auto *I = dyn_cast<Instruction>(TI.getOperand(0)))
       (void)getRegisterNameFromInstruction(I, false);
   }
-  void visitBitCastInst(BitCastInst &BCI) {
+  void visitBitCastInst(BitCastInst &BCI) {    
     auto [Op1, _] = getOperand(BCI.getOperand(0));
     string DestReg = getRegisterNameFromInstruction(&BCI, false);
     emitCopy(DestReg, Op1);
@@ -414,6 +520,10 @@ public:
       MallocOrFree = false;
       Args.emplace_back(FnName);
     }
+    if (FnName == "malloc") {
+      // put malloc call instruction in the MemAllocation vector
+      MemAllocation.push_back(&CI);
+    }    
 
     unsigned Idx = 0;
     for (auto I = CI.arg_begin(), E = CI.arg_end(); I != E; ++I) {
