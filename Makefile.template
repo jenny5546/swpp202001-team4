@@ -22,7 +22,10 @@ test: sf-compiler-tests
 
 obj/Malloc2Alloc.o: src/Malloc2Alloc.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
-	
+
+obj/Malloc2AllocinMain.o: src/Malloc2AllocinMain.cpp $(DEPS)
+	@$(CXX) $(CXXFLAGS) -c -o $@ $<
+
 obj/ArithmeticPass.o: src/ArithmeticPass.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
 
