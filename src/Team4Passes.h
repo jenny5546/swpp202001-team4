@@ -47,10 +47,8 @@ public:
 
 class FunctionOutlinePass : public llvm::PassInfoMixin<FunctionOutlinePass> {
 public:
-
     bool isOutlinedArgs(const BasicBlock *Block, Value *V);
     unsigned countOutlinedArgs(BasicBlock *Block, vector<Value *> funcArgs);
-
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
