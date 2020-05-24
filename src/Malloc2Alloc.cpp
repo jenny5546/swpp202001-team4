@@ -133,10 +133,12 @@
       // Replace malloc call instructions with alloc instructions
       for(Instruction *I : ReplaceableMallocs) {
           auto *CI = dyn_cast<CallInst>(I);
-          Type *MallocType = getMallocAllocatedType(CI, &TLI);
+          PointerType *MallocType = dyn_cast<PointerType>(getMallocAllocatedType(CI, &TLI));
+          if (!MallocType)
+            continue;
           Value *MallocSize = getMallocArraySize(CI, DL, &TLI, true);
           IB.SetInsertPoint(dyn_cast<Instruction>(F.getEntryBlock().getFirstInsertionPt()));
-          Value *Alloca = IB.CreateAlloca(MallocType, MallocSize);
+          Value *Alloca = IB.CreateAlloca(MallocType->getElementType(), MallocSize);
           Alloca->takeName(CI);
           CI->replaceAllUsesWith(Alloca);
           CI->eraseFromParent();

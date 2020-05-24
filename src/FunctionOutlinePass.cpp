@@ -96,17 +96,12 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
 
                 if (countArgs>=11){
                     outs()<<"count is "<<countArgs<<"\n";
-                    // outs()<<"wtf1\n";
-                    // while(!pointToInsert->getNextNode()->getNextNode()->isTerminator()){
-                    while(point<totalInsts){
-                        // outs()<<"wtf2\n";
+
+                    while(totalInsts-point>3){
+
                         pointToInsert = pointToInsert->getNextNode();
-                        // outs()<<"wtf3\n";
                         MergeBlockIntoPredecessor(succ);
-                        // outs()<<"wtf4\n";
-                        // succ = BB.splitBasicBlock(pointToInsert, "outline");
                         succ = SplitBlock(&BB, pointToInsert); 
-                        // outs()<<"outlined2"<<"\n";
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         point++;
                         outs()<<"(inside loop) count is "<<countArgs<<"\n";
@@ -117,6 +112,9 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                         }
                     }
                     
+                }
+                else{
+                    canSplit= true;
                 }
                 // BB.getTerminator()->eraseFromParent();
                 // IRBuilder<> builder(&BB);
@@ -132,12 +130,12 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 }
             }
 
-            //2. 함수 안에 여러 Block이 있을 경우, 전에 block이 너무 많이 썼으면 다음엔 보내버렷
+            // 2. 함수 안에 여러 Block이 있을 경우, 전에 block이 너무 많이 썼으면 다음엔 보내버렷
 
             if (regsInFunc > 13 && numOfBlocks>1 && regsInBlock>3 && !splitBlockFlag){ 
-                outs() << "BlockExtractor: Extracting "
-                                    << BB.getParent()->getName() << ":" << BB.getName()
-                                    << "\n";
+                // outs() << "BlockExtractor: Extracting "
+                //                     << BB.getParent()->getName() << ":" << BB.getName()
+                //                     << "\n";
                 BBs.push_back(&BB);
                 if (const InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator()))
                     BBs.push_back(II->getUnwindDest());
@@ -149,6 +147,15 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 CodeExtractorAnalysisCache CEAC(F);
                 CodeExtractor(BB).extractCodeRegion(CEAC);
             } 
+            // else {
+            //     unsigned instsInBlock;
+            //     unsigned splitPoint=1;
+            //     for (auto &I : *BB){
+            //         instsInBlock++;
+            //     }
+            //     // 그 block에 몇 개 의 instruction이 있는지 셌으니 10개이상의 param이 필요한 애이면, 또쪼개서.. loop
+
+            // }
         }
         
         vector <Instruction*> callInstsToErase;
