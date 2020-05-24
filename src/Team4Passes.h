@@ -26,7 +26,7 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
-#include "llvm/IR/Dominators.h"
+
 #include <algorithm>
 #include <memory>
 #include <string>
