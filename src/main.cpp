@@ -103,13 +103,14 @@ int main(int argc, char **argv) {
   FPM.addPass(SimplifyCFGPass());
   FPM.addPass(DCEPass());
   FPM.addPass(ArithmeticPass());
+  FPM.addPass(GVN());
   FPM.addPass(Malloc2AllocPass());
 
   ModulePassManager MPM;
   MPM.addPass(FunctionOutlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
-
+  MPM.addPass(Malloc2AllocinMainPass());
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
 
   // Run!
