@@ -49,7 +49,8 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
   if (I == nullptr || (RegToAllocaMap.count(I) || !RegToRegMap.count(I))) {
     if (Ops != nullptr) { /* attempt to use register name of operand */
       for (auto *OpVal : *Ops) {
-        if (!isa<Instruction>(OpVal) || !OpVal->hasOneUse()) // must be an instruction that is only used here
+        if (!isa<Instruction>(OpVal) || !OpVal->hasOneUse() || // must be an instruction that is only used here
+             dyn_cast<Instruction>(OpVal)->getParent() != I->getParent()) // operand must be in same block for dependence safety
           continue;
         for (unsigned i = 0; i < TempRegCnt; i++) { // if only used once, search for its register ID
             if (TempRegUsers[i].first != OpVal)
@@ -213,6 +214,7 @@ void DepromoteRegisters::resolveRegDependency() {
   /* resolve dependency issues by adding load/store insts where dependency could occur */
   vector <pair<Instruction *, pair<Instruction *, Instruction *>>> LoadToAdd;
   vector<pair<Instruction *, Instruction *>> StoreToAdd;
+  vector<Instruction *> StoreToRemove;
 
   for (auto *BB : BasicBlockBFS) {
     for (auto &I: *BBMap[BB]) {
@@ -220,14 +222,33 @@ void DepromoteRegisters::resolveRegDependency() {
         /* store to XX_slot register indicate eviction from reg, hence start checking */
         auto *Op = SI->getValueOperand();
         auto *OpI = dyn_cast<Instruction>(Op);
+        auto *PtyI = SI->getPointerOperand();
 
         if ((!SI->getPointerOperand()->getName().endswith("_slot") && // must be eviction to stack created during depromotion
              !SI->getPointerOperand()->getName().endswith("_phi")) || !Evictions.count(SI) || !OpI)
             continue;
 
-        unsigned isStored = 0;
-        for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr) {
-          Instruction *UsrI = dyn_cast<Instruction>((*itr).getUser());
+
+        StoreToRemove.push_back(&I);
+        if (!isa<PHINode>(Op) &&
+            !(isa<LoadInst>(Op) && dyn_cast<LoadInst>(Op)->getPointerOperand() == SI->getPointerOperand()))
+          StoreToAdd.push_back(make_pair(OpI, dyn_cast<AllocaInst>(SI->getPointerOperand())));
+
+        vector<pair<Instruction *, Instruction *>> InstsToResolve;
+        for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr)
+          InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr).getUser()), OpI));
+        for (auto itr = PtyI->use_begin(), end = PtyI->use_end(); itr != end; ++itr) {
+          if (auto *LI = dyn_cast<LoadInst>((*itr).getUser())) {
+            for (auto itr2 = LI->use_begin(), end2 = LI->use_end(); itr2 != end2; ++itr2) {
+              if (isa<Instruction>((*itr2).getUser()) && dyn_cast<Instruction>((*itr2).getUser())->getParent() != LI->getParent())
+                InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr2).getUser()), LI));
+            }
+          }
+        }
+
+        for (auto entry : InstsToResolve) {
+          Instruction *UsrI = entry.first;
+          Instruction *OpI = dyn_cast<Instruction>(entry.second);
           if (!UsrI || UsrI == SI) 
             continue;
 
@@ -235,21 +256,15 @@ void DepromoteRegisters::resolveRegDependency() {
           getBlockBFS(SI->getParent(), Reachables);
 
           for (BasicBlock *Reachable : Reachables) {
-            if (Reachable != UsrI->getParent())
+            if (Reachable != UsrI->getParent() || Reachable == OpI->getParent())
                 continue;
 
             for (auto &UserBBInst : *Reachable) {
               Instruction *PtyOp = ValToAllocaMap[Op];
-              if (&UserBBInst == OpI) 
-                break;
               if (&UserBBInst != UsrI || !PtyOp)
                 continue;
 
               /* user instruction is reachable after eviction */
-              if (!isStored && !dyn_cast<LoadInst>(OpI)) {
-                StoreToAdd.push_back(make_pair(OpI, PtyOp));
-                isStored = 1;
-              }
 
               LoadToAdd.push_back(make_pair(PtyOp, make_pair(OpI, UsrI)));
               break;
@@ -270,7 +285,10 @@ void DepromoteRegisters::resolveRegDependency() {
     for (unsigned i = 0, n = entry.second.second->getNumOperands(); i < n; i++)
       if (entry.second.second->getOperand(i) == entry.second.first)
         entry.second.second->setOperand(i, Res); // this is for passing use_empty()
+    
   }
+  for (auto entry : StoreToRemove)
+    entry->eraseFromParent();
 }
 
 void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary memory operations
@@ -279,7 +297,8 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
   for (auto *BB : BasicBlockBFS) { // go through every instruction, looking for alloca/load/store
     LoadInst *PrevLI = nullptr;
     for (auto &I : *BBMap[BB]) {
-      if (I.hasName() && I.use_empty() && (isa<AllocaInst>(&I) || isa<LoadInst>(&I))) {
+      if (I.hasName() && I.use_empty() && (isa<AllocaInst>(&I))) { //|| isa<LoadInst>(&I))) {
+
         InstsToRemove.insert(&I); // remove alloca/load that is not used
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
         if (I.hasOneUse() && isa<StoreInst>(I.use_begin()->getUser()) && // remove load whose only use is store back
@@ -404,6 +423,11 @@ void DepromoteRegisters::visitModule(Module &M) {
 void DepromoteRegisters::visitFunction(Function &F) {
   assert(FuncMap.count(&F));
   FuncToEmit = FuncMap[&F];
+  InstMap.clear();
+  ValToAllocaMap.clear();
+  RegToRegMap.clear();
+  RegToAllocaMap.clear();
+  Evictions.clear();
 
   // Fill source argument -> target argument map.
   for (unsigned i = 0, e = F.arg_size(); i < e; ++i) {
@@ -486,10 +510,14 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
             }
         }
 
-        InstCount.push_back(SingleInstCount);
+        for (int i = 0; i <= InstCount.size(); i++) {
+          if (i == InstCount.size() || InstCount[i].first < SingleInstCount.first) {
+            InstCount.insert(InstCount.begin() + i, SingleInstCount);
+            break;
+          }
+        }
       }
     }
-    std::sort(InstCount.begin(), InstCount.end()); 
 
     /* if phi uses constant, or is dependent on other phi on same block, must be put on stack */
     for (unsigned i = 0, sz = InstCount.size(); i < sz; i++) {
@@ -511,7 +539,6 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         InstCount.erase(InstCount.begin() + i--); // so that only either of dependent phis 
       sz = InstCount.size();                      // are deleted, not both
     }
-    reverse(InstCount.begin(), InstCount.end()); // descending order
     
     /* assign permanent register users */
     for (unsigned i = 0, sz = InstCount.size(); i < 16 - TempRegCnt && i < sz; i++)
