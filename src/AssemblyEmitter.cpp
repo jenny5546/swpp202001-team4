@@ -1,19 +1,5 @@
 #include "SimpleBackend.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/InstVisitor.h"
-#include "llvm/Analysis/ValueTracking.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/Value.h"
-#include "llvm/IR/Use.h"
-#include "llvm/Support/Casting.h"
-
-#include <regex>
-#include <set>
-#include <sstream>
-#include <string>
-
-using namespace llvm;
-using namespace std;
+#include "Team4Passes.h"
 
 namespace {
 
@@ -173,10 +159,11 @@ public:
   StackFrame CurrentStackFrame;
   // Instruction pointer vector for Memory Instructions (Malloc, Alloca, Global Variables)
   vector<Instruction *> MemAllocation;
-  /* a boolean variable to check if the memory access has changed from before
-     if an instruction accesses heap (malloc and global variable) accessHeap will be true, 
-     if an instruction accesses stack (alloca) accessHeap will be false */
-  bool accessHeap;
+  /* an integer variable to check if the memory access has changed from before
+     if an instruction accesses heap (malloc and global variable) accessHeap will be 1, 
+     if an instruction accesses stack (alloca) accessHeap will be 0
+     if unknown (initial state) accessHeap will be 2 */
+  int accessHeap;
   
 private:
   // ----- Emit functions -----
@@ -284,7 +271,7 @@ public:
     raiseErrorIf(!BB.hasName(), "This basic block does not have name: ", &BB);
     /* since we only look for the changes of the memory access within the same block, 
        we initialize accessHeap to false for every basicblock */ 
-    accessHeap = false;
+    accessHeap = 2;
     emitBasicBlockStart(BB.getName().str());
   }
 
@@ -311,56 +298,44 @@ public:
       emitAssembly(DestReg, "add", {"sp", std::to_string(ofs), "64"});
     }
   }
+
+ 
   void visitLoadInst(LoadInst &LI) {
     /* store previous memory access info in the variable 'prev'
-       if this load inst accesses stack -> accessHeap = false,
-       if this load inst accesses heap -> accessHeap = true
+       if this load inst accesses stack -> accessHeap = 0,
+       if this load inst accesses heap -> accessHeap = 1
        if the value of accessHeap changes from the prev, emit reset  */
-    bool prev = accessHeap;
+    int prev = accessHeap;
     string loc;
-    if(isa<IntToPtrInst>(LI.getPointerOperand())){
-      accessHeap = true;
-      loc = "heap";
-    }
+    
     for(Instruction* I: MemAllocation){
       CallInst *CI = dyn_cast<CallInst>(I);
       AllocaInst *AI = dyn_cast<AllocaInst>(I);
-      BitCastInst *BCI = dyn_cast<BitCastInst>(I);
       
       if(CI && (CI == GetUnderlyingObject(LI.getPointerOperand(),CI->getParent()->getParent()->getParent()->getDataLayout()))){
-              accessHeap = true;
+              accessHeap = 1;
               loc = "heap";      
       }
-      // if(CallInst *CI = dyn_cast<CallInst>(I)){
-      //   for(auto U : I -> users()){
-      //     if(LoadInst *li = dyn_cast<LoadInst>(U)){
-      //       if(li == &LI){
-      //         accessHeap = true;
-      //         loc = "heap";
-      //         //emitReset(loc);
-      //       }
-      //     }
-      //   }
-      // }
       if(AI) {
         for(auto U : I -> users()){
           if(LoadInst *li = dyn_cast<LoadInst>(U)){
             if(li == &LI){
-              accessHeap = false;
+              accessHeap = 0;
               loc = "stack";
             }
           }
         }
       }
     }
-    if(prev != accessHeap) emitReset(loc);
+    /* to code as conservative as possible, I will not emit reset if it is 100% sure 
+    that the memory access location has changed */
+    if((prev != accessHeap) && (prev!=2)) emitReset(loc);
     auto [PtrOp, StackOffset] = getOperand(LI.getPointerOperand(), false);
     string Dest = getRegisterNameFromInstruction(&LI, true);
     string sz = getAccessSizeInStr(LI.getType());
 
-    if (StackOffset != -1){
+    if (StackOffset != -1)
       emitAssembly(Dest, "load", {sz, "sp", std::to_string(StackOffset)});
-    }
     else
       emitAssembly(Dest, "load", {sz, PtrOp, "0"});
   }
@@ -368,35 +343,20 @@ public:
 
   void visitStoreInst(StoreInst &SI) {
     /* memory access change detection has the same logic as visitLoadInst */
-    bool prev = accessHeap;
-    string loc;
-    if(isa<IntToPtrInst>(SI.getPointerOperand())){
-      accessHeap = true;
-      loc = "heap";
-    }    
+    int prev = accessHeap;
+    string loc;  
     for(Instruction* I: MemAllocation){
       CallInst *CI = dyn_cast<CallInst>(I);
       AllocaInst *AI = dyn_cast<AllocaInst>(I);      
       if(CI && (CI == GetUnderlyingObject(SI.getPointerOperand(),CI->getParent()->getParent()->getParent()->getDataLayout()))){
-              accessHeap = true;
+              accessHeap = 1;
               loc = "heap";      
       }
-      // if(CallInst *CI = dyn_cast<CallInst>(I)){
-      //   for(auto U : I -> users()){
-      //     if(StoreInst *si = dyn_cast<StoreInst>(U)){
-      //       if(si == &SI){
-      //         accessHeap = true;
-      //         loc = "heap";
-      //         //emitReset(loc);              
-      //       }
-      //     }
-      //   }
-      // }
       if(AI) {
         for(auto U : I -> users()){
           if(StoreInst *si = dyn_cast<StoreInst>(U)){
             if(si == &SI){
-              accessHeap = false;
+              accessHeap = 0;
               loc = "stack";
             }
           }
@@ -404,14 +364,13 @@ public:
         }
       }
     }
-    if(prev != accessHeap) emitReset(loc);
+    if((prev != accessHeap) && (prev!=2)) emitReset(loc);
     auto [ValOp, _] = getOperand(SI.getValueOperand(), true);
     auto [PtrOp, StackOffset] = getOperand(SI.getPointerOperand(), false);
     string sz = getAccessSizeInStr(SI.getValueOperand()->getType());
 
-    if (StackOffset != -1){
+    if (StackOffset != -1)
       emitAssembly("store", {sz, ValOp, "sp", std::to_string(StackOffset)});
-    }
     else
       emitAssembly("store", {sz, ValOp, PtrOp, "0"});
   }
