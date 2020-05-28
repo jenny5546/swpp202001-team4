@@ -3,7 +3,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
-#include "llvm/Analysis/OrderedInstructions.h"
 #include "llvm/Analysis/TargetFolder.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -40,18 +39,9 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/Analysis/BasicAliasAnalysis.h"
-#include "llvm/Analysis/AliasAnalysis.h"
 #include <algorithm>
 
 #include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Scalar/LICM.h"
-#include "llvm/Transforms/Scalar/LoopInstSimplify.h"
-#include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
-#include "llvm/Transforms/Scalar/LoopStrengthReduce.h"
-#include "llvm/Transforms/Scalar/IndVarSimplify.h"
-#include "llvm/Transforms/Scalar/LoopDeletion.h"
-#include "llvm/Analysis/OptimizationRemarkEmitter.h"
 
 using namespace std;
 using namespace llvm;
@@ -93,6 +83,7 @@ private:
   BasicBlock *BBToEmit = nullptr;
   unique_ptr<IRBuilder<TargetFolder>> Builder;
   Function *MallocFn = nullptr;
+  Instruction *DummyInst;
   unsigned TempRegCnt;
 
   /* data for building depromoted module */
@@ -107,7 +98,6 @@ private:
   map<Instruction *, unsigned> RegToRegMap;  // permanent register user to register number
   map<Instruction *, AllocaInst *> RegToAllocaMap;
   vector<pair<Instruction *, pair<Value *, unsigned>>> TempRegUsers; // temporary users
-  map<Instruction *, bool> Evictions;
 
   void raiseError(Instruction &I);
 
@@ -118,7 +108,7 @@ private:
 
   /* assembly allocation and management */
   string assemblyRegisterName(unsigned registerId);
-  string retrieveAssemblyRegister(Instruction *I, vector<Value*> *Ops = nullptr);
+  string retrieveAssemblyRegister(Instruction *I);
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId);
   void emitStoreToSrcRegister(Value *V, Instruction *I);
 
@@ -126,14 +116,12 @@ private:
   void saveInst(Value *Res, Instruction *I);
   void saveTempInst(Instruction *OldI, Value *Res);
   void evictTempInst(Instruction *I);
-  bool TraverseBlocksBFS(BasicBlock *StartBB, vector<BasicBlock *> *BasicBlockBFS = nullptr);
+  void getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS);
   
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId);
 
   /* after-depromotion clean-up functions */
   void resolveRegDependency();
-  void removeExtraMemoryInsts();
-  void cleanRedundantCasts();
 
 public:
   Module *getDepromotedModule() const;
