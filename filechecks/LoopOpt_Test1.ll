@@ -7,32 +7,10 @@ target triple = "x86_64-unknown-linux-gnu"
 
 ; Function Attrs: nounwind uwtable
 define dso_local void @test1(i64 %n) #0 {
-; CHECK:      start test1 1:
-; CHECK-NEXT:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 808 64
-; CHECK-NEXT:     r15 = add sp 8 64
-; CHECK-NEXT:     r16 = mul arg1 arg1 64
-; CHECK-NEXT:     r10 = sub 0 r16 64
-; CHECK-NEXT:     store 8 0 sp 0
-; CHECK-NEXT:     r9 = mul r15 1 64
-; CHECK-NEXT:     br .for.cond
-; CHECK:        .for.cond:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r2 = mul r9 1 64
-; CHECK-NEXT:     r14 = icmp ne r1 100 64
-; CHECK-NEXT:     br r14 .for.body .for.end
-; CHECK:        .for.body:
-; CHECK-NEXT:     r11 = add r10 r1 64
-; CHECK-NEXT:     store 8 r11 r2 0
-; CHECK-NEXT:     r13 = add r1 1 64
-; CHECK-NEXT:     r12 = add r9 8 64
-; CHECK-NEXT:     store 8 r13 sp 0
-; CHECK-NEXT:     r9 = mul r12 1 64
-; CHECK-NEXT:     br .for.cond
-; CHECK:        .for.end:
-; CHECK-NEXT:     ret 0
-; CHECK-NEXT: end test1
+; CHECK-LABEL: test1
+; CHECK: .entry:
+; CHECK: mul arg1 arg1 64
+; CHECK: .for.cond:
 
 entry:
   %a = alloca [100 x i64], align 16
@@ -65,72 +43,10 @@ declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1
 declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 
 ; Function Attrs: nounwind uwtable
-define dso_local void @test2() #0 {
-; CHECK:      start test2 0:
-; CHECK-NEXT:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 808 64
-; CHECK-NEXT:     r12 = add sp 8 64
-; CHECK-NEXT:     store 8 0 sp 0
-; CHECK-NEXT:     r7 = mul r12 1 64
-; CHECK-NEXT:     br .for.cond
-; CHECK:        .for.cond:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r2 = mul r7 1 64
-; CHECK-NEXT:     r10 = icmp ne r1 100 64
-; CHECK-NEXT:     br r10 .for.body .for.end
-; CHECK:        .for.body:
-; CHECK-NEXT:     r11 = load 8 20480 0
-; CHECK-NEXT:     r13 = add r1 r11 64
-; CHECK-NEXT:     store 8 r13 r2 0
-; CHECK-NEXT:     r9 = add r1 1 64
-; CHECK-NEXT:     r8 = add r7 8 64
-; CHECK-NEXT:     store 8 r9 sp 0
-; CHECK-NEXT:     r7 = mul r8 1 64
-; CHECK-NEXT:     br .for.cond
-; CHECK:        .for.end:
-; CHECK-NEXT:     ret 0
-; CHECK-NEXT: end test2
-
-entry:
-  %a = alloca [100 x i64], align 16
-  br label %for.cond
-
-for.cond:                                         ; preds = %for.inc, %entry
-  %i.0 = phi i64 [ 0, %entry ], [ %inc, %for.inc ]
-  %cmp = icmp slt i64 %i.0, 100
-  br i1 %cmp, label %for.body, label %for.end
-
-for.body:                                         ; preds = %for.cond
-  %0 = load i64, i64* @var, align 8
-  %add = add nsw i64 %i.0, %0
-  %arrayidx = getelementptr inbounds [100 x i64], [100 x i64]* %a, i64 0, i64 %i.0
-  store i64 %add, i64* %arrayidx, align 8
-  br label %for.inc
-
-for.inc:                                          ; preds = %for.body
-  %inc = add nsw i64 %i.0, 1
-  br label %for.cond
-
-for.end:                                          ; preds = %for.cond
-  ret void
-}
-
-; Function Attrs: nounwind uwtable
 define dso_local i32 @main() #0 {
-; CHECK:      start main 0:
-; CHECK-NEXT:   .entry:
-; CHECK-NEXT:     r1 = malloc 8
-; CHECK-NEXT:     r16 = call read
-; CHECK-NEXT:     call test1 r16
-; CHECK-NEXT:     call test2
-; CHECK-NEXT:     ret 0
-; CHECK-NEXT: end main
-
 entry:
   %call = call i64 (...) @read()
   call void @test1(i64 %call)
-  call void @test2()
   ret i32 0
 }
 

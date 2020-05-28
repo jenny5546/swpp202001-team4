@@ -5,34 +5,19 @@ target triple = "x86_64-unknown-linux-gnu"
 
 ; Function Attrs: nounwind uwtable
 define dso_local void @test1(i64 %n) #0 {
-; CHECK:      start test1 1:
-; CHECK-NEXT:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 8 64
-; CHECK-NEXT:     store 8 5 sp 0
-; CHECK-NEXT:     br .for.cond
-; CHECK:        .for.cond:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r15 = icmp ne r1 13 64
-; CHECK-NEXT:     br r15 .for.body .for.end
-; CHECK:        .for.body:
-; CHECK-NEXT:     call write arg1
-; CHECK-NEXT:     r14 = add r1 1 64
-; CHECK-NEXT:     store 8 r14 sp 0
-; CHECK-NEXT:     br .for.cond
-; CHECK:        .for.end:
-; CHECK-NEXT:     ret 0
-; CHECK-NEXT: end test1
+; CHECK-LABEL: test1
+; CHECK: [[COND:r[0-9]+]] = icmp ne [[REG1:r[0-9]+]] 99 64
+; CHECK: br [[COND]]
 
 entry:
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry
-  %i.0 = phi i64 [ 5, %entry ], [ %inc, %for.inc ]
+  %i.0 = phi i64 [ 0, %entry ], [ %inc, %for.inc ]
   %mul = mul nsw i64 %i.0, %i.0
   %mul1 = mul nsw i64 %i.0, 3
   %add = add nsw i64 %mul, %mul1
-  %cmp = icmp slt i64 %add, 200
+  %cmp = icmp slt i64 %add, 10000
   br i1 %cmp, label %for.body, label %for.end
 
 for.body:                                         ; preds = %for.cond
@@ -57,10 +42,10 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 
 ; Function Attrs: nounwind uwtable
 define dso_local void @test2() #0 {
-; CHECK:      start test2 0:
-; CHECK-NEXT:   .entry:
-; CHECK-NEXT:     ret 0
-; CHECK-NEXT: end test2
+; CHECK-LABEL: test2
+; CHECK: .entry:
+; CHECK-NEXT: ret 0
+
 entry:
   br label %for.cond
 
@@ -82,13 +67,6 @@ for.end:                                          ; preds = %for.cond
 
 ; Function Attrs: nounwind uwtable
 define dso_local i32 @main() #0 {
-; CHECK:      start main 0:
-; CHECK-NEXT:   .entry:
-; CHECK-NEXT:     r16 = call read
-; CHECK-NEXT:     call test1 r16
-; CHECK-NEXT:     call test2
-; CHECK-NEXT:     ret 0
-; CHECK-NEXT: end main
 
 entry:
   %call = call i64 (...) @read()
