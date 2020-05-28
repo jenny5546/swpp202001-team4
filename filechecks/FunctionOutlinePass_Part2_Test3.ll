@@ -251,13 +251,9 @@ for.end:                                          ; preds = %for.cond.cleanup
 }
 
 ; CHECK-NOT:  start main.for.body [[SCOPE:[0-10]+]]:
-; CHECK-NOT: .newFuncRoot:
 ; CHECK-NOT:  end main.for.body
 
-; CHECK-NOT:  start prevSum.for.body [[SCOPE:[0-10]+]]:
-; CHECK-NOT: .newFuncRoot:
-; CHECK-NOT:  end prevSum.for.body
-
+; CHECK: .newFuncRoot:
 
 declare void @write(i64) #2
 

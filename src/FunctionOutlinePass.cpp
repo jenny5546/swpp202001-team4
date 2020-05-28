@@ -91,14 +91,14 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 succ = SplitBlock(&BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 /* Is unsafe to split, outlines to func args with more than 10 args */
-                if (countArgs>=12){
+                if (countArgs>=15){
                     while(totalInsts-point>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
                         succ = SplitBlock(&BB, pointToInsert); 
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         point++;
-                        if (countArgs<12){
+                        if (countArgs<15){
                             canSplit= true;
                             break;
                         }
@@ -124,7 +124,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
         }
         for (auto BB : BBs){
             /* Is safe to split */
-            if (countOutlinedArgs(BB, funcArgs)<12){
+            if (countOutlinedArgs(BB, funcArgs)<15){
                 // CodeExtractorAnalysisCache CEAC(F);
                 CodeExtractor(BB).extractCodeRegion(CEAC);
             }
@@ -147,7 +147,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 bool canSplit = false;
                 /* Find split the block to another block, so that 
                 the outlined func does not exceed 10 func args */
-                if (countArgs>=12){
+                if (countArgs>=15){
                     while(instsInBlock-splitPoint>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
@@ -155,7 +155,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         splitPoint++;
                         
-                        if (countArgs<12){
+                        if (countArgs<15){
                             canSplit= true;
                             break;
                         }
