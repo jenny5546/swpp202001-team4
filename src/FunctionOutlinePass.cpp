@@ -14,8 +14,8 @@ bool FunctionOutlinePass::isOutlinedArgs(const BasicBlock *Block, Value *V) {
       
       if (isa<Argument>(V)) return true;
       if (Instruction *I = dyn_cast<Instruction>(V))
-          if (I->getParent()->getName()!=Block->getName())
-          return true;
+          if (I->getParent()!=Block)
+            return true;
       return false;
 
 }
@@ -42,14 +42,15 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
 
         SmallVector<BasicBlock *, 16> BBs;
         vector<Value *> funcArgs;
+        CodeExtractorAnalysisCache CEAC(F);
 
         // Get Function arguments and save them in a vector
         for (auto *itr = F.arg_begin(), *end = F.arg_end(); itr != end; ++itr)
             funcArgs.push_back(&*itr);
         unsigned regsInFunc = 0;
-        unsigned numOfBlocks = 0;
+        unsigned blockCnt = 0;
         for (auto &BB : F) {
-            numOfBlocks++;
+            blockCnt++;
         }
         for (auto &BB : F ) {
             bool splitBlockFlag = false;
@@ -68,37 +69,36 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 //  Count regs with name in characters & regs that have names like %0, %1...
                 if (I.hasName() || !I.hasName() && !I.getType()->isVoidTy()) { 
                     regsInBlock ++; 
-                    regsInFunc++;    
+                       
                 }
-                if (regsInBlock ==14){
+                if (regsInBlock ==15){
                     pointToInsert = &I;
                     point= totalInsts;
                 }
-                if (regsInBlock > 13 && !I.isTerminator()){ 
+                if (regsInBlock >= 15 && !I.isTerminator()){ 
                     splitBlockFlag = true;
                 } 
             }
+
+            regsInFunc+=regsInBlock;
+
             /* [Case 1] Split a single big block into pieces */
 
             if (splitBlockFlag){
                 BasicBlock *succ;
                 unsigned countArgs=0;
                 bool canSplit = false;
-                outs()<<point<<"\n";
                 succ = SplitBlock(&BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 /* Is unsafe to split, outlines to func args with more than 10 args */
                 if (countArgs>=11){
-                    outs()<<"count is "<<countArgs<<"\n";
                     while(totalInsts-point>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
                         succ = SplitBlock(&BB, pointToInsert); 
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         point++;
-                        outs()<<"(inside loop) count is "<<countArgs<<"\n";
                         if (countArgs<11){
-                            outs()<<"split\n";
                             canSplit= true;
                             break;
                         }
@@ -110,16 +110,14 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     canSplit= true;
                 }
                 if (canSplit){
-                    CodeExtractorAnalysisCache CEAC(F);
+                    // CodeExtractorAnalysisCache CEAC(F);
                     Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
-                    outs()<<"Splitting 완료\n";
                 }
                 else{
-                    outs()<<"This block cannot be outlined\n";
                 }
             }
             /* [Case 2] Split whole blocks if the function uses a lot of regs */
-            if (regsInFunc > 13 && numOfBlocks>1 && regsInBlock>3 && !splitBlockFlag){ 
+            if (regsInFunc >= 15 && blockCnt>1 && regsInBlock>10 && !splitBlockFlag){ 
                 BBs.push_back(&BB);
                 if (const InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator()))
                     BBs.push_back(II->getUnwindDest());
@@ -127,8 +125,8 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
         }
         for (auto BB : BBs){
             /* Is safe to split */
-            if (countOutlinedArgs(BB, funcArgs)<=10){
-                CodeExtractorAnalysisCache CEAC(F);
+            if (countOutlinedArgs(BB, funcArgs)<11){
+                // CodeExtractorAnalysisCache CEAC(F);
                 CodeExtractor(BB).extractCodeRegion(CEAC);
             }
             /* Is unsafe to split, outlines to func args with more than 10 args */
@@ -169,7 +167,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     canSplit= true;
                 }
                 if (canSplit){
-                    CodeExtractorAnalysisCache CEAC(F);
+                    // CodeExtractorAnalysisCache CEAC(F);
                     Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
                 }
             }
@@ -219,7 +217,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                             }
                         }
                         if (!somethingElse){
-                            outs()<<calledfunc->getName()<<"\n";
                             callInstsToErase.push_back(&I);
                         }
                     }
