@@ -26,12 +26,17 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/IR/Use.h"
+#include "llvm/IR/Value.h"
 
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <sstream>
 #include <vector>
+#include <regex>
+#include <set>
 
 using namespace std;
 using namespace llvm;
