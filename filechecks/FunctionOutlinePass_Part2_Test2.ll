@@ -7,6 +7,7 @@ target triple = "x86_64-apple-macosx10.14.0"
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @unefficientSum(i32 %n) #0 {
+; CHECK: start unefficientSum 1:
 entry:
   br label %for.cond
 
@@ -118,14 +119,13 @@ for.end:                                          ; preds = %for.cond.cleanup
   ret i32 0
 }
 
+; CHECK-NOT:  start main.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end main.for.body
 
-; CHECK:  start unefficientSum.for.body5 3:
-; CHECK:    .newFuncRoot:
-; CHECK:  end unefficientSum.for.body5
-
-; CHECK:  start unefficientSum.for.body15 3:
-; CHECK:    .newFuncRoot:
-; CHECK:  end unefficientSum.for.body15
+; CHECK-NOT:  start unefficientSum.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end unefficientSum.for.body
 
 
 declare void @write(i64) #2

@@ -1,7 +1,5 @@
 ; ModuleID = '/tmp/a.ll'
-source_filename = "/Users/jaeeun/Desktop/llvmscript/team/test/jaeeuntests/test1/test1.c"
-target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
-target triple = "x86_64-apple-macosx10.14.0"
+
 
 @arr = external global [100 x i32], align 16
 
@@ -108,18 +106,13 @@ for.end:                                          ; preds = %for.cond.cleanup
   ret i32 0
 }
 
-; CHECK: start unrolledSum.for.body.split 4:
-; CHECK:     r16 = add arg1 arg2 32
-; CHECK: end unrolledSum.for.body.split
+; CHECK-NOT:  start main.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end main.for.body
 
-; CHECK: start main.for.body.split 2:
-; CHECK:   .newFuncRoot:
-; CHECK: end main.for.body.split
-
-; CHECK: start main.for.end 0:
-; CHECK:   .newFuncRoot:
-
-; CHECK: end main.for.end
+; CHECK-NOT:  start unrolledSum.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end unrolledSum.for.body
 
 declare void @write(i64) #2
 

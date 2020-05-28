@@ -7,6 +7,7 @@ target triple = "x86_64-apple-macosx10.14.0"
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @prevSum(i32 %n) #0 {
+; CHECK: start prevSum 1:
 entry:
   br label %for.cond
 
@@ -249,30 +250,14 @@ for.end:                                          ; preds = %for.cond.cleanup
   ret i32 0
 }
 
+; CHECK-NOT:  start main.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end main.for.body
 
-; CHECK: start prevSum.for.body.split 4:
-; CHECK-NEXT:   .newFuncRoot:
-; CHECK: end prevSum.for.body.split
+; CHECK-NOT:  start prevSum.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end prevSum.for.body
 
-
-; CHECK: start main.for.body.split 2:
-; CHECK:   .newFuncRoot:
-; CHECK: end main.for.body.split
-
-
-; CHECK: start main.for.end 0:
-; CHECK:   .newFuncRoot:
-; CHECK: end main.for.end
-
-
-; CHECK: start prevSum.for.body.split.for.body.split.split 4:
-; CHECK:   .newFuncRoot:
-; CHECK: end prevSum.for.body.split.for.body.split.split
-
-
-; CHECK: start prevSum.for.body.split.for.body.split.split.for.body.split.split.split 4:
-; CHECK:   .newFuncRoot:
-; CHECK: end prevSum.for.body.split.for.body.split.split.for.body.split.split.split
 
 declare void @write(i64) #2
 
