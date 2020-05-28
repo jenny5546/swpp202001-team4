@@ -71,7 +71,8 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     regsInBlock ++; 
                        
                 }
-                if (regsInBlock ==15){
+                if (regsInBlock ==15 && !I.isTerminator()){
+                    // outs()<<"fuck"<<"\n";
                     pointToInsert = &I;
                     point= totalInsts;
                 }
@@ -91,14 +92,14 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 succ = SplitBlock(&BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 /* Is unsafe to split, outlines to func args with more than 10 args */
-                if (countArgs>=11){
+                if (countArgs>=12){
                     while(totalInsts-point>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
                         succ = SplitBlock(&BB, pointToInsert); 
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         point++;
-                        if (countArgs<11){
+                        if (countArgs<12){
                             canSplit= true;
                             break;
                         }
@@ -110,8 +111,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     canSplit= true;
                 }
                 if (canSplit){
-                    // CodeExtractorAnalysisCache CEAC(F);
-                    Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
+                    // Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
                 }
                 else{
                 }
@@ -125,7 +125,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
         }
         for (auto BB : BBs){
             /* Is safe to split */
-            if (countOutlinedArgs(BB, funcArgs)<11){
+            if (countOutlinedArgs(BB, funcArgs)<12){
                 // CodeExtractorAnalysisCache CEAC(F);
                 CodeExtractor(BB).extractCodeRegion(CEAC);
             }
@@ -148,7 +148,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 bool canSplit = false;
                 /* Find split the block to another block, so that 
                 the outlined func does not exceed 10 func args */
-                if (countArgs>=11){
+                if (countArgs>=12){
                     while(instsInBlock-splitPoint>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
@@ -156,7 +156,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         splitPoint++;
                         
-                        if (countArgs<11){
+                        if (countArgs<12){
                             canSplit= true;
                             break;
                         }
