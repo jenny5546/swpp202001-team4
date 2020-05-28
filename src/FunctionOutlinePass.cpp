@@ -72,7 +72,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                        
                 }
                 if (regsInBlock ==15 && !I.isTerminator()){
-                    // outs()<<"fuck"<<"\n";
                     pointToInsert = &I;
                     point= totalInsts;
                 }
