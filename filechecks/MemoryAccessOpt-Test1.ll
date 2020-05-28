@@ -1,13 +1,12 @@
 ; ModuleID = '/tmp/a.ll'
-source_filename = "/Users/ohah/Documents/swpp-project/testcases/mytest/Mem1.c"
+source_filename = "/Users/ohah/Documents/swpp-project/testcases/mytest/Mem2.c"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-apple-macosx10.14.0"
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @main() #0 {
-; start main 0: 
+; CHECK: start main 0:
 entry:
-  %numArr = alloca [10 x i32], align 16
   %conv = sext i32 8 to i64
   %mul = mul i64 %conv, 4
   %call = call i8* @malloc(i64 %mul) #4
@@ -15,78 +14,39 @@ entry:
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry
-  %i.0 = phi i32 [ 0, %entry ], [ %inc, %for.inc ]
+  %i.0 = phi i32 [ 0, %entry ], [ %inc3, %for.inc ]
+  %inc.0 = phi i32 [ 3, %entry ], [ %inc2, %for.inc ]
   %cmp = icmp slt i32 %i.0, 8
   br i1 %cmp, label %for.body, label %for.cond.cleanup
 
 for.cond.cleanup:                                 ; preds = %for.cond
+
   br label %for.end
 
 for.body:                                         ; preds = %for.cond
-; CHECK: reset heap
 ; CHECK: reset stack
+  %add = add nsw i32 %i.0, %inc.0
   %idxprom = sext i32 %i.0 to i64
   %arrayidx = getelementptr inbounds i32, i32* %0, i64 %idxprom
-  store i32 %i.0, i32* %arrayidx, align 4
+  store i32 %add, i32* %arrayidx, align 4
+  %inc2 = add nsw i32 %inc.0, 1
   br label %for.inc
 
 for.inc:                                          ; preds = %for.body
-  %inc = add nsw i32 %i.0, 1
+  %inc3 = add nsw i32 %i.0, 1
   br label %for.cond
-
 for.end:                                          ; preds = %for.cond.cleanup
-  %arraydecay = getelementptr inbounds [10 x i32], [10 x i32]* %numArr, i64 0, i64 0
-  call void @dataInput(i32* %arraydecay)
-  br label %for.cond3
+  %arrayidx4 = getelementptr inbounds i32, i32* %0, i64 5
+  store i32 4, i32* %arrayidx4, align 4
+  %cmp8 = icmp ne i32* %0, null
+  br i1 %cmp8, label %if.then, label %if.end
 
-for.cond3:                                        ; preds = %for.inc12, %for.end
-  %i2.0 = phi i32 [ 0, %for.end ], [ %inc13, %for.inc12 ]
-  %cmp4 = icmp slt i32 %i2.0, 8
-  br i1 %cmp4, label %for.body7, label %for.cond.cleanup6
-
-for.cond.cleanup6:                                ; preds = %for.cond3
-  br label %for.end14
-
-for.body7:                                        ; preds = %for.cond3
-; CHECK: reset heap
-; CHECK: reset stack
-  %idxprom8 = sext i32 %i2.0 to i64
-  %arrayidx9 = getelementptr inbounds i32, i32* %0, i64 %idxprom8
-  %1 = load i32, i32* %arrayidx9, align 4
-  %idxprom10 = sext i32 %i2.0 to i64
-  %arrayidx11 = getelementptr inbounds [10 x i32], [10 x i32]* %numArr, i64 0, i64 %idxprom10
-  store i32 %1, i32* %arrayidx11, align 4
-  br label %for.inc12
-
-for.inc12:                                        ; preds = %for.body7
-  %inc13 = add nsw i32 %i2.0, 1
-  br label %for.cond3
-
-for.end14:                                        ; preds = %for.cond.cleanup6
-  br label %while.cond
-
-while.cond:                                       ; preds = %while.body, %for.end14
-  %a.0 = phi i32 [ 10, %for.end14 ], [ %inc19, %while.body ]
-  %cmp15 = icmp sle i32 %a.0, 10
-  br i1 %cmp15, label %while.body, label %while.end
-
-while.body:                                       ; preds = %while.cond
-  %idxprom17 = sext i32 %a.0 to i64
-  %arrayidx18 = getelementptr inbounds [10 x i32], [10 x i32]* %numArr, i64 0, i64 %idxprom17
-  store i32 %a.0, i32* %arrayidx18, align 4
-  %inc19 = add nsw i32 %a.0, 1
-  br label %while.cond
-
-while.end:                                        ; preds = %while.cond
-  %cmp20 = icmp ne i32* %0, null
-  br i1 %cmp20, label %if.then, label %if.end
-
-if.then:                                          ; preds = %while.end
-  %2 = bitcast i32* %0 to i8*
-  call void @free(i8* %2)
+if.then:                                          ; preds = %for.end
+  %1 = bitcast i32* %0 to i8*
+  call void @free(i8* %1)
   br label %if.end
 
-if.end:                                           ; preds = %if.then, %while.end
+if.end:                                           ; preds = %if.then, %for.end
   ret i32 0
 }
 ; CHECK: end main
@@ -99,33 +59,6 @@ declare i8* @malloc(i64) #2
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
-
-; Function Attrs: nounwind ssp uwtable
-define void @dataInput(i32* %arr) #0 {
-entry:
-  br label %for.cond
-
-for.cond:                                         ; preds = %for.inc, %entry
-  %i.0 = phi i32 [ 0, %entry ], [ %inc, %for.inc ]
-  %cmp = icmp slt i32 %i.0, 10
-  br i1 %cmp, label %for.body, label %for.cond.cleanup
-
-for.cond.cleanup:                                 ; preds = %for.cond
-  br label %for.end
-
-for.body:                                         ; preds = %for.cond
-  %idxprom = sext i32 %i.0 to i64
-  %arrayidx = getelementptr inbounds i32, i32* %arr, i64 %idxprom
-  store i32 %i.0, i32* %arrayidx, align 4
-  br label %for.inc
-
-for.inc:                                          ; preds = %for.body
-  %inc = add nsw i32 %i.0, 1
-  br label %for.cond
-
-for.end:                                          ; preds = %for.cond.cleanup
-  ret void
-}
 
 declare void @free(i8*) #3
 
