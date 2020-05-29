@@ -7,71 +7,9 @@ target triple = "x86_64-apple-macosx10.14.0"
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @countFibTotal(i32 %n) #0 {
-; CHECK:   start countFibTotal 1:
+; CHECK: start countFibTotal 1:
 entry:
-; CHECK:  sp = sub sp 184 64
-; CHECK-NEXT:  r1 = add sp 176 64
-; CHECK-NEXT:  store 8 r1 sp 0
-; CHECK-NEXT:  store 8 20480 sp 8
-; CHECK-NEXT:  r1 = load 8 sp 8
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 16
-; CHECK-NEXT:  store 8 20484 sp 24
-; CHECK-NEXT:  r1 = load 8 sp 24
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 32
-; CHECK-NEXT:  r1 = load 8 sp 16
-; CHECK-NEXT:  r2 = load 8 sp 32
-; CHECK-NEXT:  r1 = add r1 r2 32
-; CHECK-NEXT:  store 8 r1 sp 40
-; CHECK-NEXT:  store 8 20488 sp 48
-; CHECK-NEXT:  r1 = load 8 sp 48
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 56
-; CHECK-NEXT:  r1 = load 8 sp 40
-; CHECK-NEXT:  r2 = load 8 sp 56
-; CHECK-NEXT:  r1 = add r1 r2 32
-; CHECK-NEXT:  store 8 r1 sp 64
-; CHECK-NEXT:  store 8 20492 sp 72
-; CHECK-NEXT:  r1 = load 8 sp 72
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 80
-; CHECK-NEXT:  r1 = load 8 sp 64
-; CHECK-NEXT:  r2 = load 8 sp 80
-; CHECK-NEXT:  r1 = add r1 r2 32
-; CHECK-NEXT:  store 8 r1 sp 88
-; CHECK-NEXT:  store 8 20496 sp 96
-; CHECK-NEXT:  r1 = load 8 sp 96
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 104
-; CHECK-NEXT:  r1 = load 8 sp 88
-; CHECK-NEXT:  r2 = load 8 sp 104
-; CHECK-NEXT:  r1 = add r1 r2 32
-; CHECK-NEXT:  store 8 r1 sp 112
-; CHECK-NEXT:  store 8 20480 sp 120
-; CHECK-NEXT:  r1 = load 8 sp 120
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 128
-; CHECK-NEXT:  r1 = load 8 sp 112
-; CHECK-NEXT:  r2 = load 8 sp 128
-; CHECK-NEXT:  r1 = sub r1 r2 32
-; CHECK-NEXT:  store 8 r1 sp 136
-; CHECK-NEXT:  store 8 20480 sp 144
-; CHECK-NEXT:  r1 = load 8 sp 144
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 152
-; CHECK-NEXT:  r1 = load 8 sp 136
-; CHECK-NEXT:  r2 = load 8 sp 152
-; CHECK-NEXT:  r1 = add r1 r2 32
-; CHECK-NEXT:  store 8 r1 sp 160
-; CHECK-NEXT:  r1 = load 8 sp 160
-; CHECK-NEXT:  r2 = load 8 sp 0
-; CHECK-NEXT:  call countFibTotal.outline r1 r2
-; CHECK-NEXT:  r1 = load 8 sp 0
-; CHECK-NEXT:  r1 = load 4 r1 0
-; CHECK-NEXT:  store 8 r1 sp 168
-; CHECK-NEXT:  r1 = load 8 sp 168
-; CHECK-NEXT:  ret r1
+
   %0 = load i32, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @arr, i64 0, i64 0), align 16
   %1 = load i32, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @arr, i64 0, i64 1), align 4
   %add = add nsw i32 %0, %1
@@ -95,29 +33,12 @@ entry:
 ; Function Attrs: nounwind ssp uwtable
 define i32 @main() #0 {
 entry:
-  ;CHECK: .entry:
-  ;CHECK:  sp = sub sp 184 64
-  ;CHECK-NEXT:  r1 = malloc 24
-  ;CHECK-NEXT:  store 8 20480 sp 0
-  ;CHECK-NEXT:  r2 = load 8 sp 0
-  ;CHECK-NEXT:  store 4 1 r2 0
-  ;CHECK-NEXT:  store 8 20484 sp 8
-  ;CHECK-NEXT:  r2 = load 8 sp 8
-  ;CHECK-NEXT:  store 4 1 r2 0
-  ;CHECK-NEXT:  store 8 2 sp 24
-  ;CHECK-NEXT:  r1 = load 8 sp 24
-  ;CHECK-NEXT:  store 8 r1 sp 16
-  ;CHECK-NEXT:  br .for.cond
+
   store i32 1, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @arr, i64 0, i64 0), align 16
   store i32 1, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @arr, i64 0, i64 1), align 4
   br label %for.cond
 
 for.cond:                                   ; preds = %for.inc, %entry
-;CHECK: r1 = load 8 sp 16
-;CHECK-NEXT: r1 = icmp slt r1 5 32
-;CHECK-NEXT: store 8 r1 sp 32
-;CHECK-NEXT: r1 = load 8 sp 32
-;CHECK-NEXT: br r1 .for.body .for.end
   %i.0 = phi i32 [ 2, %entry ], [ %inc, %for.inc ]
   %cmp = icmp slt i32 %i.0, 5
   br i1 %cmp, label %for.body, label %for.cond.cleanup
@@ -126,71 +47,7 @@ for.cond.cleanup:                                 ; preds = %for.cond
   br label %for.end
 
 for.body:  
-;CHECK:  r1 = load 8 sp 16
-;CHECK-NEXT:  r1 = sub r1 2 32
-;CHECK-NEXT:  store 8 r1 sp 40
-;CHECK-NEXT:  r1 = load 8 sp 40
-;CHECK-NEXT:  r2 = and r1 2147483648 64
-;CHECK-NEXT:  r2 = sub 0 r2 64
-;CHECK-NEXT:  r1 = or r2 r1 64
-;CHECK-NEXT:  store 8 r1 sp 48
-;CHECK-NEXT:  r2 = load 8 sp 48
-;CHECK-NEXT:  r2 = mul r2 4 64
-;CHECK-NEXT:  r1 = add 20480 r2 64
-;CHECK-NEXT:  store 8 r1 sp 56
-;CHECK-NEXT:  r1 = load 8 sp 56
-;CHECK-NEXT:  r1 = load 4 r1 0
-;CHECK-NEXT:  store 8 r1 sp 64
-;CHECK-NEXT:  r1 = load 8 sp 16
-;CHECK-NEXT:  r2 = and r1 2147483648 64
-;CHECK-NEXT:  r2 = sub 0 r2 64
-;CHECK-NEXT:  r1 = or r2 r1 64
-;CHECK-NEXT:  store 8 r1 sp 72
-;CHECK-NEXT:  r2 = load 8 sp 72
-;CHECK-NEXT:  r2 = mul r2 4 64
-;CHECK-NEXT:  r1 = add 20480 r2 64
-;CHECK-NEXT:  store 8 r1 sp 80
-;CHECK-NEXT:  r1 = load 8 sp 80
-;CHECK-NEXT:  r1 = load 4 r1 0
-;CHECK-NEXT:  store 8 r1 sp 88
-;CHECK-NEXT:  r1 = load 8 sp 88
-;CHECK-NEXT:  r2 = load 8 sp 64
-;CHECK-NEXT:  r1 = add r1 r2 32
-;CHECK-NEXT:  store 8 r1 sp 96
-;CHECK-NEXT:  r1 = load 8 sp 96
-;CHECK-NEXT:  r2 = load 8 sp 80
-;CHECK-NEXT:  store 4 r1 r2 0
-;CHECK-NEXT:  r1 = load 8 sp 16
-;CHECK-NEXT:  r1 = sub r1 1 32
-;CHECK-NEXT:  store 8 r1 sp 104
-;CHECK-NEXT:  r1 = load 8 sp 104
-;CHECK-NEXT:  r2 = and r1 2147483648 64
-;CHECK-NEXT:  r2 = sub 0 r2 64
-;CHECK-NEXT:  r1 = or r2 r1 64
-;CHECK-NEXT:  store 8 r1 sp 112
-;CHECK-NEXT:  r2 = load 8 sp 112
-;CHECK-NEXT:  r2 = mul r2 4 64
-;CHECK-NEXT:  r1 = add 20480 r2 64
-;CHECK-NEXT:  store 8 r1 sp 120
-;CHECK-NEXT:  r1 = load 8 sp 120
-;CHECK-NEXT:  r1 = load 4 r1 0
-;CHECK-NEXT:  store 8 r1 sp 128
-;CHECK-NEXT:  r1 = load 8 sp 16
-;CHECK-NEXT:  r2 = and r1 2147483648 64
-;CHECK-NEXT:  r2 = sub 0 r2 64
-;CHECK-NEXT:  r1 = or r2 r1 64
-;CHECK-NEXT:  store 8 r1 sp 136
-;CHECK-NEXT:  r1 = load 8 sp 136
-;CHECK-NEXT:  r2 = load 8 sp 128
-;CHECK-NEXT:  call main.outline r1 r2
-;CHECK-NEXT:  r1 = load 8 sp 16
-;CHECK-NEXT:  r1 = add r1 1 32
-;CHECK-NEXT:  store 8 r1 sp 144
-;CHECK-NEXT:  r1 = load 8 sp 144
-;CHECK-NEXT:  store 8 r1 sp 24
-;CHECK-NEXT:  r1 = load 8 sp 24
-;CHECK-NEXT:  store 8 r1 sp 16
-;CHECK-NEXT:  br .for.cond                                       
+                                   
   %sub = sub nsw i32 %i.0, 2
   %idxprom = sext i32 %sub to i64
   %arrayidx = getelementptr inbounds [5 x i32], [5 x i32]* @arr, i64 0, i64 %idxprom
@@ -216,22 +73,7 @@ for.inc:                                          ; preds = %for.body
   br label %for.cond
 
 for.end:
-;CHECK:  r1 = call read
-;CHECK-NEXT:  store 8 r1 sp 152
-;CHECK-NEXT:  r1 = load 8 sp 152
-;CHECK-NEXT:  r1 = and r1 4294967295 64
-;CHECK-NEXT:  store 8 r1 sp 160
-;CHECK-NEXT:  r1 = load 8 sp 160
-;CHECK-NEXT:  r1 = call countFibTotal r1
-;CHECK-NEXT:  store 8 r1 sp 168
-;CHECK-NEXT:  r1 = load 8 sp 168
-;CHECK-NEXT:  r2 = and r1 2147483648 64
-;CHECK-NEXT:  r2 = sub 0 r2 64
-;CHECK-NEXT:  r1 = or r2 r1 64
-;CHECK-NEXT:  store 8 r1 sp 176
-;CHECK-NEXT:  r1 = load 8 sp 176
-;CHECK-NEXT:  call write r1
-;CHECK-NEXT:  ret 0                                          
+                                     
   %call = call i64 (...) @read()
   %conv = trunc i64 %call to i32
   %call9 = call i32 @countFibTotal(i32 %conv)
@@ -240,49 +82,15 @@ for.end:
   ret i32 0
 }
 
-;CHECK:  start countFibTotal.outline 2:
-;CHECK-NEXT:    .newFuncRoot:
-;CHECK-NEXT:      ; init sp!
-;CHECK-NEXT:      sp = sub sp 48 64
-;CHECK-NEXT:      store 8 20484 sp 0
-;CHECK-NEXT:      r1 = load 8 sp 0
-;CHECK-NEXT:      r1 = load 4 r1 0
-;CHECK-NEXT:      store 8 r1 sp 8
-;CHECK-NEXT:      r2 = load 8 sp 8
-;CHECK-NEXT:      r1 = sub arg1 r2 32
-;CHECK-NEXT:      store 8 r1 sp 16
-;CHECK-NEXT:      store 8 20484 sp 24
-;CHECK-NEXT:      r1 = load 8 sp 24
-;CHECK-NEXT:      r1 = load 4 r1 0
-;CHECK-NEXT:      store 8 r1 sp 32
-;CHECK-NEXT:      r1 = load 8 sp 16
-;CHECK-NEXT:      r2 = load 8 sp 32
-;CHECK-NEXT:      r1 = add r1 r2 32
-;CHECK-NEXT:      store 8 r1 sp 40
-;CHECK-NEXT:      r1 = load 8 sp 40
-;CHECK-NEXT:      store 4 r1 arg2 0
-;CHECK-NEXT:      ret 0
-;CHECK-NEXT:  end countFibTotal.outline
+; CHECK-NOT:  start main.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end main.for.body
+
+; CHECK-NOT:  start countFibTotal.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NOT: .newFuncRoot:
+; CHECK-NOT:  end countFibTotal.for.body
 
 
-;CHECK:  start main.outline 2:
-;CHECK-NEXT:    .newFuncRoot:
-;CHECK-NEXT:      ; init sp!
-;CHECK-NEXT:      sp = sub sp 24 64
-;CHECK-NEXT:      r2 = mul arg1 4 64
-;CHECK-NEXT:      r1 = add 20480 r2 64
-;CHECK-NEXT:      store 8 r1 sp 0
-;CHECK-NEXT:      r1 = load 8 sp 0
-;CHECK-NEXT:      r1 = load 4 r1 0
-;CHECK-NEXT:      store 8 r1 sp 8
-;CHECK-NEXT:      r1 = load 8 sp 8
-;CHECK-NEXT:      r1 = add r1 arg2 32
-;CHECK-NEXT:      store 8 r1 sp 16
-;CHECK-NEXT:      r1 = load 8 sp 16
-;CHECK-NEXT:      r2 = load 8 sp 0
-;CHECK-NEXT:      store 4 r1 r2 0
-;CHECK-NEXT:      ret 0
-;CHECK-NEXT:  end main.outline
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1
