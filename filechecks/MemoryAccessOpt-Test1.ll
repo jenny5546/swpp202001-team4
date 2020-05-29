@@ -24,7 +24,6 @@ for.cond.cleanup:                                 ; preds = %for.cond
   br label %for.end
 
 for.body:                                         ; preds = %for.cond
-; CHECK: reset stack
   %add = add nsw i32 %i.0, %inc.0
   %idxprom = sext i32 %i.0 to i64
   %arrayidx = getelementptr inbounds i32, i32* %0, i64 %idxprom

@@ -9,8 +9,6 @@ define i32 @main() #0 {
 entry:
 ; CHECK: reset heap
 ; CHECK: reset stack
-; CHECK: reset heap
-; CHECK: reset stack
   %arr = alloca [3 x i32], align 4
   %conv = sext i32 24 to i64
   %mul = mul i64 %conv, 8
