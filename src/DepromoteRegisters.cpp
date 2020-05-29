@@ -237,8 +237,7 @@ void DepromoteRegisters::resolveRegDependency() {
               if (isa<Instruction>((*itr2).getUser()) && dyn_cast<Instruction>((*itr2).getUser())->getParent() != LI->getParent())
                 InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr2).getUser()), LI));
         for (auto entry : InstsToResolve) {
-          Instruction *UsrI = entry.first;
-          Instruction *OpI = dyn_cast<Instruction>(entry.second);
+          Instruction *UsrI = entry.first, *OpI = dyn_cast<Instruction>(entry.second);
           if (!UsrI || UsrI == SI) 
             continue;
 
@@ -325,8 +324,7 @@ void DepromoteRegisters::cleanRedundantCasts() {
         if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 || // cases to ignore
             Op->getName().str().find("arg") != string::npos ||
             Op->getName().str().find("before_zext__") != string::npos ||
-            CI->getName().str().find("after_trunc__") != string::npos)
-          continue;
+            CI->getName().str().find("after_trunc__") != string::npos) continue;
         for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
           if (&*itr != CI) continue; // if CI is only used once in the next/next-next inst, then it can use Op name
           if ((++itr != end && &*itr == CI->use_begin()->getUser()) ||
@@ -480,15 +478,13 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
         if (!I.hasName() || dyn_cast<CastInst>(&I)) // casts are usually for one-time use; make it temporary
             continue;
 
-        vector<BasicBlock *> temp;
         auto SingleInstCount = make_pair(0, &I);
         for (auto itr = (I).use_begin(), end = (I).use_end(); itr != end; ++itr) {
             if (auto *UserI = dyn_cast<Instruction>((*itr).getUser())) {
                 SingleInstCount.first++;
-                if (getBlockBFS(UserI->getParent(), temp)) 
+                if (getBlockBFS(UserI->getParent(), *(new vector<BasicBlock *>))) 
                   SingleInstCount.first += 2; // give more priority if it is used within loop
-                if (isa<PHINode>(&I)) 
-                  SingleInstCount.first += 10; // give a lot of priority if instruction is phi value
+                if (isa<PHINode>(&I)) SingleInstCount.first += 10; // give a lot of priority if instruction is phi value
             }
         }
         for (int i = 0; i <= InstCount.size(); i++) {
@@ -501,7 +497,7 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
     }
 
     /* if phi uses constant, or is dependent on other phi on same block, must be put on stack */
-    for (unsigned i = 0, shouldErase = 0, sz = InstCount.size(); i < sz; i++, shouldErase = 0) {
+    for (unsigned i = 0, shouldErase = 0, sz = InstCount.size(); i < sz; i++, shouldErase = 0, sz = InstCount.size()) {
       if (auto *phi = dyn_cast<PHINode>(InstCount[i].second)) {
         for (unsigned j = 0, end = phi->getNumIncomingValues(); j < end; j++)
           if (isa<Constant>(phi->getIncomingValue(j))) 
@@ -514,9 +510,7 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
                 shouldErase = 1;
         }
       }
-      if (shouldErase)                            // deletion has to be done within iteration 
-        InstCount.erase(InstCount.begin() + i--); // so that only either of dependent phis 
-      sz = InstCount.size();                      // are deleted, not both
+      if (shouldErase) InstCount.erase(InstCount.begin() + i--); // deletion has to be done within iteration so that only either of dependent phis are deleted
     }
     
     /* assign permanent register users */
@@ -869,10 +863,8 @@ void DepromoteRegisters::processPHIsInSuccessor(BasicBlock *Succ, BasicBlock *BB
     checkTgtType(V->getType());
     assert(!isa<Instruction>(V) || !V->hasName() ||
            V->getName().startswith("__r"));
-    if (RegToAllocaMap.count(&PHI))
-      StoreToMake.push_back(&PHI); // store to stack must be done first to avoid dependency issue
-    else
-      RegCopyToMake.push_back(&PHI);
+    if (RegToAllocaMap.count(&PHI)) StoreToMake.push_back(&PHI);
+    else RegCopyToMake.push_back(&PHI); // store to stack must be done first to avoid dependency issue
   }
   for (auto *PHI: StoreToMake)
     Builder->CreateStore(
