@@ -497,20 +497,18 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
     }
 
     /* if phi uses constant, or is dependent on other phi on same block, must be put on stack */
-    for (unsigned i = 0, shouldErase = 0, sz = InstCount.size(); i < sz; i++, shouldErase = 0, sz = InstCount.size()) {
+    for (unsigned i = 0, flag = 0, sz = InstCount.size(); i < sz; i++, flag = 0, sz = InstCount.size()) {
       if (auto *phi = dyn_cast<PHINode>(InstCount[i].second)) {
         for (unsigned j = 0, end = phi->getNumIncomingValues(); j < end; j++)
-          if (isa<Constant>(phi->getIncomingValue(j))) 
-            shouldErase = 1; // LLVM IR does not allow assigning constant to register, so delete
+          if (isa<Constant>(phi->getIncomingValue(j))) flag = 1; // LLVM IR does not allow assigning constant to register, so delete
         for (auto itr = phi->use_begin(), end = phi->use_end(); itr != end; ++itr) {
           auto *UsrI = dyn_cast<Instruction>(itr->getUser());
           if (isa<PHINode>(UsrI) && UsrI->getParent() == phi->getParent())
             for (unsigned j = 0; j < sz; j++)
-              if (InstCount[j].second == UsrI) // there is another phi, that is used by this phi, on permanent candidates
-                shouldErase = 1;
+              if (InstCount[j].second == UsrI) flag = 1; // there is another phi, that is used by this phi, on permanent candidates
         }
       }
-      if (shouldErase) InstCount.erase(InstCount.begin() + i--); // deletion has to be done within iteration so that only either of dependent phis are deleted
+      if (flag) InstCount.erase(InstCount.begin() + i--); // deletion has to be done within iteration so that only either of dependent phis are deleted
     }
     
     /* assign permanent register users */
