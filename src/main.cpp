@@ -87,7 +87,6 @@ int main(int argc, char **argv) {
   LPM1.addPass(LICMPass());
   
   LoopPassManager LPM2;
-  LPM2.addPass(IndVarSimplifyPass());
   LPM2.addPass(LoopDeletionPass());
 
 

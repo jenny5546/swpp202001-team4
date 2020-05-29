@@ -6,7 +6,7 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define dso_local void @test1(i64 %n) #0 {
 ; CHECK-LABEL: test1
-; CHECK: [[COND:r[0-9]+]] = icmp ne [[REG1:r[0-9]+]] 99 64
+; CHECK: [[COND:r[0-9]+]] = icmp slt [[REG1:r[0-9]+]] 10000 64
 ; CHECK: br [[COND]]
 
 entry:
