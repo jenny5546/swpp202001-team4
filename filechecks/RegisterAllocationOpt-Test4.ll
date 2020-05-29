@@ -6,89 +6,14 @@ target triple = "x86_64-apple-macosx10.14.0"
 ; Function Attrs: nounwind ssp uwtable
 define i32 @main() #0 {
 ; CHECK: start main 0:
-; CHECK:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 24 64
-; CHECK-NEXT:     store 8 0 sp 0
-; CHECK-NEXT:     store 8 0 sp 8
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r3 = load 8 sp 8
-; CHECK-NEXT:     r6 = icmp ult r1 10 64
-; CHECK-NEXT:     r9 = mul r1 1 64
-; CHECK-NEXT:     r15 = mul r3 1 64
-; CHECK-NEXT:     br r6 .for.cond1 .for.end28
-; CHECK:   .for.cond1:
-; CHECK-NEXT:     r8 = icmp ult r9 10 64
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r11 = mul r1 1 64
-; CHECK-NEXT:     r13 = mul r15 1 64
-; CHECK-NEXT:     br r8 .for.cond4 .for.inc26
-; CHECK:   .for.end28:
-; CHECK-NEXT:     r3 = load 8 sp 8
-; CHECK-NEXT:     call write r3
-; CHECK-NEXT:     ret 0
-; CHECK:   .for.cond4:
-; CHECK-NEXT:     r4 = icmp ult r11 r9 64
-; CHECK-NEXT:     store 8 10000000 sp 16
-; CHECK-NEXT:     r14 = mul r13 1 64
-; CHECK-NEXT:     br r4 .for.cond7 .for.inc23
-; CHECK:   .for.inc26:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r16 = add r1 1 64
-; CHECK-NEXT:     store 8 r16 sp 0
-; CHECK-NEXT:     store 8 r15 sp 8
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond7:
-; CHECK-NEXT:     r7 = load 8 sp 16
-; CHECK-NEXT:     r2 = icmp ult r7 10005000 64
-; CHECK-NEXT:     br r2 .for.body9 .for.inc20
-; CHECK:   .for.inc23:
-; CHECK-NEXT:     r5 = add r9 1 64
-; CHECK-NEXT:     r9 = mul r5 1 64
-; CHECK-NEXT:     r15 = mul r13 1 64
-; CHECK-NEXT:     br .for.cond1
-; CHECK:   .for.body9:
-; CHECK-NEXT:     store 8 r1 sp 0
-; CHECK-NEXT:     r7 = load 8 sp 16
-; CHECK-NEXT:     r1 = sub r7 100 64
-; CHECK-NEXT:     r10 = mul r1 1 64
-; CHECK-NEXT:     r12 = mul r14 1 64
-; CHECK-NEXT:     br .for.cond10
-; CHECK:   .for.inc20:
-; CHECK-NEXT:     store 8 r3 sp 8
-; CHECK-NEXT:     r3 = add r11 1 64
-; CHECK-NEXT:     r11 = mul r3 1 64
-; CHECK-NEXT:     r13 = mul r14 1 64
-; CHECK-NEXT:     br .for.cond4
-; CHECK:   .for.cond10:
-; CHECK-NEXT:     r7 = load 8 sp 16
-; CHECK-NEXT:     r6 = icmp ult r10 r7 64
-; CHECK-NEXT:     br r6 .for.body12 .for.inc17
-; CHECK:   .for.body12:
-; CHECK-NEXT:     r8 = load 8 sp 0
-; CHECK-NEXT:     r4 = add r8 r9 64
-; CHECK-NEXT:     r4 = add r4 r11 64
-; CHECK-NEXT:     r7 = load 8 sp 16
-; CHECK-NEXT:     r4 = add r4 r7 64
-; CHECK-NEXT:     r4 = add r4 r10 64
-; CHECK-NEXT:     r4 = add r12 r4 64
-; CHECK-NEXT:     store 8 r7 sp 16
-; CHECK-NEXT:     r7 = add r10 1 64
-; CHECK-NEXT:     r10 = mul r7 1 64
-; CHECK-NEXT:     r12 = mul r4 1 64
-; CHECK-NEXT:     br .for.cond10
-; CHECK:   .for.inc17:
-; CHECK-NEXT:     r2 = load 8 sp 16
-; CHECK-NEXT:     r5 = add r2 1 64
-; CHECK-NEXT:     store 8 r5 sp 16
-; CHECK-NEXT:     r14 = mul r12 1 64
-; CHECK-NEXT:     br .for.cond7
 entry:
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc26, %entry
+; CHECK: [[REG:]] =  load 8 sp [[#SP:]]
+; CHECK-NEXT: [[REG:]] =  load 8 sp [[#SP:]]
   %a.0 = phi i64 [ 0, %entry ], [ %inc27, %for.inc26 ]
   %f.0 = phi i64 [ 0, %entry ], [ %f.1, %for.inc26 ]
   %cmp = icmp ult i64 %a.0, 10
@@ -113,9 +38,11 @@ for.cond4:                                        ; preds = %for.inc20, %for.bod
   br i1 %cmp5, label %for.body6, label %for.end22
 
 for.body6:                                        ; preds = %for.cond4
+; CHECK: [[REG:]] store 8 10000000 sp [[#SP:]]
   br label %for.cond7
 
 for.cond7:                                        ; preds = %for.inc17, %for.body6
+; CHECK: [[REG:]] =  load 8 sp [[#SP:]]
   %d.0 = phi i64 [ 10000000, %for.body6 ], [ %inc18, %for.inc17 ]
   %f.3 = phi i64 [ %f.2, %for.body6 ], [ %f.4, %for.inc17 ]
   %cmp8 = icmp ult i64 %d.0, 10005000

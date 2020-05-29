@@ -6,117 +6,13 @@ target triple = "x86_64-apple-macosx10.14.0"
 ; Function Attrs: nounwind ssp uwtable
 define void @convolution(i64 %M, i64 %N, i64* %input, i64* %output, [3 x i64]* %filter) #0 {
 ; CHECK: start convolution 5:
-; CHECK:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 32 64
-; CHECK-NEXT:     store 8 0 sp 0
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r4 = icmp slt r1 arg1 64
-; CHECK-NEXT:     store 8 0 sp 8
-; CHECK-NEXT:     br r4 .for.cond1 .for.end49
-; CHECK:   .for.cond1:
-; CHECK-NEXT:     r7 = load 8 sp 8
-; CHECK-NEXT:     r3 = icmp slt r7 arg2 64
-; CHECK-NEXT:     store 8 0 sp 16
-; CHECK-NEXT:     br r3 .for.cond5 .for.inc47
-; CHECK:   .for.end49:
-; CHECK-NEXT:     ret 0
-; CHECK:   .for.cond5:
-; CHECK-NEXT:     r8 = load 8 sp 16
-; CHECK-NEXT:     r6 = icmp slt r8 3 64
-; CHECK-NEXT:     store 8 0 sp 24
-; CHECK-NEXT:     br r6 .for.cond9 .for.inc44
-; CHECK:   .for.inc47:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r9 = add r1 1 64
-; CHECK-NEXT:     store 8 r9 sp 0
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond9:
-; CHECK-NEXT:     r2 = load 8 sp 24
-; CHECK-NEXT:     r5 = icmp slt r2 3 64
-; CHECK-NEXT:     br r5 .for.body12 .for.inc41
-; CHECK:   .for.inc44:
-; CHECK-NEXT:     r7 = load 8 sp 8
-; CHECK-NEXT:     r10 = add r7 1 64
-; CHECK-NEXT:     store 8 r10 sp 8
-; CHECK-NEXT:     br .for.cond1
-; CHECK:   .for.body12:
-; CHECK-NEXT:     store 8 r1 sp 0
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r8 = load 8 sp 16
-; CHECK-NEXT:     r1 = add r1 r8 64
-; CHECK-NEXT:     r1 = sub r1 1 64
-; CHECK-NEXT:     r1 = icmp slt r1 0 64
-; CHECK-NEXT:     br r1 .for.inc .if.end
-; CHECK:   .for.inc41:
-; CHECK-NEXT:     r8 = load 8 sp 16
-; CHECK-NEXT:     r11 = add r8 1 64
-; CHECK-NEXT:     store 8 r11 sp 16
-; CHECK-NEXT:     br .for.cond5
-; CHECK:   .for.inc:
-; CHECK-NEXT:     r2 = load 8 sp 24
-; CHECK-NEXT:     r12 = add r2 1 64
-; CHECK-NEXT:     store 8 r12 sp 24
-; CHECK-NEXT:     br .for.cond9
-; CHECK:   .if.end:
-; CHECK-NEXT:     r4 = load 8 sp 0
-; CHECK-NEXT:     store 8 r7 sp 8
-; CHECK-NEXT:     r8 = load 8 sp 16
-; CHECK-NEXT:     r7 = add r4 r8 64
-; CHECK-NEXT:     r7 = sub r7 1 64
-; CHECK-NEXT:     r7 = icmp sge r7 arg1 64
-; CHECK-NEXT:     br r7 .for.inc .if.end18
-; CHECK:   .if.end18:
-; CHECK-NEXT:     r3 = load 8 sp 8
-; CHECK-NEXT:     store 8 r8 sp 16
-; CHECK-NEXT:     r2 = load 8 sp 24
-; CHECK-NEXT:     r8 = add r3 r2 64
-; CHECK-NEXT:     r8 = sub r8 1 64
-; CHECK-NEXT:     r8 = icmp slt r8 0 64
-; CHECK-NEXT:     br r8 .for.inc .if.end23
-; CHECK:   .if.end23:
-; CHECK-NEXT:     r2 = load 8 sp 24
-; CHECK-NEXT:     r3 = load 8 sp 8
-; CHECK-NEXT:     r6 = add r3 r2 64
-; CHECK-NEXT:     r6 = sub r6 1 64
-; CHECK-NEXT:     r6 = icmp sge r6 arg2 64
-; CHECK-NEXT:     br r6 .for.inc .if.end28
-; CHECK:   .if.end28:
-; CHECK-NEXT:     store 8 r2 sp 24
-; CHECK-NEXT:     r2 = load 8 sp 16
-; CHECK-NEXT:     r4 = load 8 sp 0
-; CHECK-NEXT:     r5 = add r4 r2 64
-; CHECK-NEXT:     r5 = sub r5 1 64
-; CHECK-NEXT:     r5 = mul r5 arg2 64
-; CHECK-NEXT:     r1 = load 8 sp 24
-; CHECK-NEXT:     store 8 r4 sp 0
-; CHECK-NEXT:     r3 = load 8 sp 8
-; CHECK-NEXT:     r4 = add r3 r1 64
-; CHECK-NEXT:     r4 = sub r4 1 64
-; CHECK-NEXT:     r5 = add r5 r4 64
-; CHECK-NEXT:     r7 = mul arg3 1 64
-; CHECK-NEXT:     store 8 r3 sp 8
-; CHECK-NEXT:     r3 = mul r5 8 64
-; CHECK-NEXT:     r7 = add r7 r3 64
-; CHECK-NEXT:     r7 = load 8 r7 0
-; CHECK-NEXT:     r3 = mul arg5 1 64
-; CHECK-NEXT:     r8 = mul r2 24 64
-; CHECK-NEXT:     r3 = add r3 r8 64
-; CHECK-NEXT:     r8 = mul r1 8 64
-; CHECK-NEXT:     r16 = add r3 r8 64
-; CHECK-NEXT:     r15 = load 8 r16 0
-; CHECK-NEXT:     r14 = mul r7 r15 64
-; CHECK-NEXT:     r8 = load 8 sp 0
-; CHECK-NEXT:     r13 = mul r8 arg2 64
-; CHECK-NEXT:     r6 = load 8 sp 8
-; CHECK-NEXT:     call convolution.outline r13 r6 arg4 r14
-; CHECK-NEXT:     br .for.inc
+
 entry:
+; CHECK: sp = sub sp [[#SP:]] 64
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc47, %entry
+; CHECK: [[REG:]] load 8 sp [[#SP:]]
   %i.0 = phi i64 [ 0, %entry ], [ %inc48, %for.inc47 ]
   %cmp = icmp slt i64 %i.0, %M
   br i1 %cmp, label %for.body, label %for.cond.cleanup
@@ -125,6 +21,7 @@ for.cond.cleanup:                                 ; preds = %for.cond
   br label %for.end49
 
 for.body:                                         ; preds = %for.cond
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
   br label %for.cond1
 
 for.cond1:                                        ; preds = %for.inc44, %for.body
@@ -136,6 +33,7 @@ for.cond.cleanup3:                                ; preds = %for.cond1
   br label %for.end46
 
 for.body4:                                        ; preds = %for.cond1
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
   br label %for.cond5
 
 for.cond5:                                        ; preds = %for.inc41, %for.body4
@@ -147,7 +45,8 @@ for.cond.cleanup7:                                ; preds = %for.cond5
   br label %for.end43
 
 for.body8:                                        ; preds = %for.cond5
-  br label %for.cond9
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
+ br label %for.cond9
 
 for.cond9:                                        ; preds = %for.inc, %for.body8
   %y.0 = phi i64 [ 0, %for.body8 ], [ %inc, %for.inc ]
@@ -253,109 +152,9 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 ; Function Attrs: nounwind ssp uwtable
 define i32 @main() #0 {
 ; CHECK: start main 0:
-; CHECK:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 160 64
-; CHECK-NEXT:     r1 = add sp 64 64
-; CHECK-NEXT:     r3 = add sp 72 64
-; CHECK-NEXT:     r5 = add sp 80 64
-; CHECK-NEXT:     r7 = add sp 88 64
-; CHECK-NEXT:     r2 = mul r7 1 64
-; CHECK-NEXT:     r6 = mul r2 1 64
-; CHECK-NEXT:     r8 = add r6 8 64
-; CHECK-NEXT:     store 8 18446744073709551615 r8 0
-; CHECK-NEXT:     store 8 r1 sp 0
-; CHECK-NEXT:     r1 = add r6 16 64
-; CHECK-NEXT:     store 8 2 r1 0
-; CHECK-NEXT:     store 8 r3 sp 8
-; CHECK-NEXT:     r3 = add r2 24 64
-; CHECK-NEXT:     store 8 r5 sp 16
-; CHECK-NEXT:     store 8 18446744073709551615 r3 0
-; CHECK-NEXT:     store 8 r7 sp 24
-; CHECK-NEXT:     r7 = add r3 8 64
-; CHECK-NEXT:     store 8 1 r7 0
-; CHECK-NEXT:     r4 = add r3 16 64
-; CHECK-NEXT:     store 8 2 r4 0
-; CHECK-NEXT:     r2 = add r2 48 64
-; CHECK-NEXT:     store 8 1 r2 0
-; CHECK-NEXT:     r10 = call read
-; CHECK-NEXT:     r6 = load 8 sp 16
-; CHECK-NEXT:     r8 = load 8 sp 8
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     call main.outline r10 r6 r8 r1
-; CHECK-NEXT:     r9 = load 8 r6 0
-; CHECK-NEXT:     r12 = load 8 r8 0
-; CHECK-NEXT:     r11 = load 8 r1 0
-; CHECK-NEXT:     store 8 0 sp 32
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond:
-; CHECK-NEXT:     r3 = load 8 sp 32
-; CHECK-NEXT:     r5 = icmp slt r3 r10 64
-; CHECK-NEXT:     store 8 0 sp 40
-; CHECK-NEXT:     br r5 .for.cond7 .for.end18
-; CHECK:   .for.cond7:
-; CHECK-NEXT:     r7 = load 8 sp 40
-; CHECK-NEXT:     r4 = icmp slt r7 r9 64
-; CHECK-NEXT:     br r4 .for.body10 .for.inc16
-; CHECK:   .for.end18:
-; CHECK-NEXT:     r2 = load 8 sp 24
-; CHECK-NEXT:     call convolution r10 r9 r12 r11 r2
-; CHECK-NEXT:     store 8 0 sp 48
-; CHECK-NEXT:     br .for.cond20
-; CHECK:   .for.body10:
-; CHECK-NEXT:     r8 = call read
-; CHECK-NEXT:     r3 = load 8 sp 32
-; CHECK-NEXT:     r1 = mul r3 r9 64
-; CHECK-NEXT:     r7 = load 8 sp 40
-; CHECK-NEXT:     r1 = add r1 r7 64
-; CHECK-NEXT:     store 8 r3 sp 32
-; CHECK-NEXT:     r5 = mul r1 8 64
-; CHECK-NEXT:     r3 = add r12 r5 64
-; CHECK-NEXT:     store 8 r8 r3 0
-; CHECK-NEXT:     r5 = load 8 sp 32
-; CHECK-NEXT:     store 8 r7 sp 40
-; CHECK-NEXT:     r7 = mul r5 r9 64
-; CHECK-NEXT:     r4 = load 8 sp 40
-; CHECK-NEXT:     r7 = add r7 r4 64
-; CHECK-NEXT:     store 8 r2 sp 24
-; CHECK-NEXT:     r6 = mul r7 8 64
-; CHECK-NEXT:     r2 = add r11 r6 64
-; CHECK-NEXT:     store 8 0 r2 0
-; CHECK-NEXT:     r6 = add r4 1 64
-; CHECK-NEXT:     store 8 r6 sp 40
-; CHECK-NEXT:     br .for.cond7
-; CHECK:   .for.inc16:
-; CHECK-NEXT:     r8 = add r5 1 64
-; CHECK-NEXT:     store 8 r8 sp 32
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond20:
-; CHECK-NEXT:     r1 = load 8 sp 48
-; CHECK-NEXT:     r3 = icmp slt r1 r10 64
-; CHECK-NEXT:     store 8 0 sp 56
-; CHECK-NEXT:     br r3 .for.cond25 .for.end37
-; CHECK:   .for.cond25:
-; CHECK-NEXT:     store 8 r5 sp 32
-; CHECK-NEXT:     r5 = load 8 sp 56
-; CHECK-NEXT:     r16 = icmp slt r5 r9 64
-; CHECK-NEXT:     br r16 .for.body28 .for.inc35
-; CHECK:   .for.end37:
-; CHECK-NEXT:     ret 0
-; CHECK:   .for.body28:
-; CHECK-NEXT:     r15 = mul r1 r9 64
-; CHECK-NEXT:     store 8 r4 sp 40
-; CHECK-NEXT:     r4 = add r15 r5 64
-; CHECK-NEXT:     r2 = mul r4 8 64
-; CHECK-NEXT:     r7 = add r11 r2 64
-; CHECK-NEXT:     r7 = load 8 r7 0
-; CHECK-NEXT:     call write r7
-; CHECK-NEXT:     r14 = add r5 1 64
-; CHECK-NEXT:     store 8 r14 sp 56
-; CHECK-NEXT:     br .for.cond25
-; CHECK:   .for.inc35:
-; CHECK-NEXT:     r13 = add r1 1 64
-; CHECK-NEXT:     store 8 r13 sp 48
-; CHECK-NEXT:     br .for.cond20
+
 entry:
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
   %filter = alloca [3 x [3 x i64]], align 16
   %0 = bitcast [3 x [3 x i64]]* %filter to i8*
   %1 = bitcast i8* %0 to [3 x [3 x i64]]*
@@ -395,6 +194,7 @@ for.cond.cleanup:                                 ; preds = %for.cond
   br label %for.end18
 
 for.body:                                         ; preds = %for.cond
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
   br label %for.cond7
 
 for.cond7:                                        ; preds = %for.inc, %for.body
@@ -429,6 +229,7 @@ for.inc16:                                        ; preds = %for.end
   br label %for.cond
 
 for.end18:                                        ; preds = %for.cond.cleanup
+; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
   %arraydecay = getelementptr inbounds [3 x [3 x i64]], [3 x [3 x i64]]* %filter, i64 0, i64 0
   call void @convolution(i64 %call, i64 %call1, i64* %11, i64* %12, [3 x i64]* %arraydecay)
   br label %for.cond20
@@ -475,31 +276,6 @@ for.end37:                                        ; preds = %for.cond.cleanup22
   ret i32 0
 }
 ; CHECK: end main
-; CHECK: start convolution.outline 4:
-; CHECK:   .newFuncRoot:
-; CHECK-NEXT:     r16 = add arg1 arg2 64
-; CHECK-NEXT:     r13 = mul arg3 1 64
-; CHECK-NEXT:     r2 = mul r16 8 64
-; CHECK-NEXT:     r13 = add r13 r2 64
-; CHECK-NEXT:     r15 = load 8 r13 0
-; CHECK-NEXT:     r14 = add r15 arg4 64
-; CHECK-NEXT:     store 8 r14 r13 0
-; CHECK-NEXT:     ret 0
-; CHECK: end convolution.outline
-; CHECK: start main.outline 4:
-; CHECK:   .newFuncRoot:
-; CHECK-NEXT:     r8 = call read
-; CHECK-NEXT:     store 8 r8 arg2 0
-; CHECK-NEXT:     r14 = mul 8 arg1 64
-; CHECK-NEXT:     r13 = mul r14 r8 64
-; CHECK-NEXT:     r12 = malloc r13
-; CHECK-NEXT:     store 8 r12 arg3 0
-; CHECK-NEXT:     r11 = mul 8 arg1 64
-; CHECK-NEXT:     r10 = mul r11 r8 64
-; CHECK-NEXT:     r9 = malloc r10
-; CHECK-NEXT:     store 8 r9 arg4 0
-; CHECK-NEXT:     ret 0
-; CHECK: end main.outline
 
 declare i64 @read(...) #2
 

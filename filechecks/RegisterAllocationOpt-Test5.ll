@@ -6,12 +6,6 @@ target triple = "x86_64-apple-macosx10.14.0"
 ; Function Attrs: nounwind ssp uwtable
 define void @swap(i32* %a, i32* %b) #0 {
 ; CHECK: start swap 2:
-; CHECK:   .entry:
-; CHECK-NEXT:     r16 = load 4 arg2 0
-; CHECK-NEXT:     r15 = load 4 arg1 0
-; CHECK-NEXT:     store 4 r15 arg2 0
-; CHECK-NEXT:     store 4 r16 arg1 0
-; CHECK-NEXT:     ret 0
 entry:
   %0 = load i32, i32* %b, align 4
   %1 = load i32, i32* %a, align 4
@@ -29,75 +23,15 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @partition(i32* %arr, i32 %low, i32 %high) #0 {
-; CHECK: ; Function partition
 ; CHECK: start partition 3:
-; CHECK:   .entry:
-; CHECK-NEXT:     r1 = udiv arg3 2147483648 64
-; CHECK-NEXT:     r1 = mul r1 18446744071562067968 64
-; CHECK-NEXT:     r1 = or r1 arg3 64
-; CHECK-NEXT:     r3 = mul arg1 1 64
-; CHECK-NEXT:     r5 = mul r1 4 64
-; CHECK-NEXT:     r3 = add r3 r5 64
-; CHECK-NEXT:     r3 = load 4 r3 0
-; CHECK-NEXT:     r8 = sub arg2 1 32
-; CHECK-NEXT:     r10 = mul r8 1 64
-; CHECK-NEXT:     r9 = mul arg2 1 64
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond:
-; CHECK-NEXT:     r6 = sub arg3 1 32
-; CHECK-NEXT:     r6 = icmp sle r9 r6 32
-; CHECK-NEXT:     br r6 .for.body .for.end
-; CHECK:   .for.body:
-; CHECK-NEXT:     r7 = udiv r9 2147483648 64
-; CHECK-NEXT:     r7 = mul r7 18446744071562067968 64
-; CHECK-NEXT:     r7 = or r7 r9 64
-; CHECK-NEXT:     r4 = mul arg1 1 64
-; CHECK-NEXT:     r2 = mul r7 4 64
-; CHECK-NEXT:     r4 = add r4 r2 64
-; CHECK-NEXT:     r16 = load 4 r4 0
-; CHECK-NEXT:     r15 = icmp slt r16 r3 32
-; CHECK-NEXT:     r11 = mul r10 1 64
-; CHECK-NEXT:     br r15 .if.then .for.inc
-; CHECK:   .for.end:
-; CHECK-NEXT:     r5 = add r10 1 32
-; CHECK-NEXT:     r2 = udiv r5 2147483648 64
-; CHECK-NEXT:     r2 = mul r2 18446744071562067968 64
-; CHECK-NEXT:     r2 = or r2 r5 64
-; CHECK-NEXT:     r1 = mul arg1 1 64
-; CHECK-NEXT:     r8 = mul r2 4 64
-; CHECK-NEXT:     r1 = add r1 r8 64
-; CHECK-NEXT:     r8 = udiv arg3 2147483648 64
-; CHECK-NEXT:     r8 = mul r8 18446744071562067968 64
-; CHECK-NEXT:     r8 = or r8 arg3 64
-; CHECK-NEXT:     r3 = mul arg1 1 64
-; CHECK-NEXT:     r7 = mul r8 4 64
-; CHECK-NEXT:     r3 = add r3 r7 64
-; CHECK-NEXT:     call swap r1 r3
-; CHECK-NEXT:     r7 = add r10 1 32
-; CHECK-NEXT:     ret r7
-; CHECK:   .if.then:
-; CHECK-NEXT:     r12 = add r10 1 32
-; CHECK-NEXT:     r6 = udiv r12 2147483648 64
-; CHECK-NEXT:     r6 = mul r6 18446744071562067968 64
-; CHECK-NEXT:     r6 = or r6 r12 64
-; CHECK-NEXT:     r14 = mul arg1 1 64
-; CHECK-NEXT:     r4 = mul r6 4 64
-; CHECK-NEXT:     r14 = add r14 r4 64
-; CHECK-NEXT:     r4 = udiv r9 2147483648 64
-; CHECK-NEXT:     r4 = mul r4 18446744071562067968 64
-; CHECK-NEXT:     r4 = or r4 r9 64
-; CHECK-NEXT:     r5 = mul arg1 1 64
-; CHECK-NEXT:     r2 = mul r4 4 64
-; CHECK-NEXT:     r5 = add r5 r2 64
-; CHECK-NEXT:     call swap r14 r5
-; CHECK-NEXT:     r11 = mul r12 1 64
-; CHECK-NEXT:     br .for.inc
-; CHECK:   .for.inc:
-; CHECK-NEXT:     r13 = add r9 1 32
-; CHECK-NEXT:     r10 = mul r11 1 64
-; CHECK-NEXT:     r9 = mul r13 1 64
-; CHECK-NEXT:     br .for.cond
+
 entry:
+; CHECK:     [[REG:r[0-9]+]] = udiv [[ARG:arg[0-9]+]] 2147483648 64
+; CHECK-NEXT:     [[REG]] = mul [[REG]] 18446744071562067968 64
+; CHECK-NEXT:     [[REG]] = or [[REG]] [[ARG]] 64
+; CHECK-NEXT:     [[REG2:r[0-9]+]] = mul [[ARG:arg[0-9]+]] 1 64
+; CHECK-NEXT:     [[REG3:r[0-9]+]] = mul [[REG]] 4 64
+; CHECK-NEXT:     [[REG2]] = add [[REG2]] [[REG3]]  64
   %idxprom = sext i32 %high to i64
   %arrayidx = getelementptr inbounds i32, i32* %arr, i64 %idxprom
   %0 = load i32, i32* %arrayidx, align 4
@@ -153,18 +87,6 @@ for.end:                                          ; preds = %for.cond.cleanup
 ; Function Attrs: nounwind ssp uwtable
 define void @quickSort(i32* %arr, i32 %low, i32 %high) #0 {
 ; CHECK: start quickSort 3:
-; CHECK:   .entry:
-; CHECK-NEXT:     r16 = icmp slt arg2 arg3 32
-; CHECK-NEXT:     br r16 .if.then .if.end
-; CHECK:   .if.then:
-; CHECK-NEXT:     r13 = call partition arg1 arg2 arg3
-; CHECK-NEXT:     r15 = sub r13 1 32
-; CHECK-NEXT:     call quickSort arg1 arg2 r15
-; CHECK-NEXT:     r14 = add r13 1 32
-; CHECK-NEXT:     call quickSort arg1 r14 arg3
-; CHECK-NEXT:     br .if.end
-; CHECK:   .if.end:
-; CHECK-NEXT:     ret 0
 entry:
   %cmp = icmp slt i32 %low, %high
   br i1 %cmp, label %if.then, label %if.end
@@ -184,34 +106,15 @@ if.end:                                           ; preds = %if.then, %entry
 
 ; Function Attrs: nounwind ssp uwtable
 define void @printArray(i32* %arr, i32 %size) #0 {
-; CHECK: ; Function printArray
-; CHECK: start printArray 2:
-; CHECK:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 8 64
-; CHECK-NEXT:     store 8 0 sp 0
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.cond:
-; CHECK-NEXT:     r1 = load 8 sp 0
-; CHECK-NEXT:     r13 = icmp slt r1 arg2 32
-; CHECK-NEXT:     br r13 .for.body .for.end
-; CHECK:   .for.body:
-; CHECK-NEXT:     r6 = udiv r1 2147483648 64
-; CHECK-NEXT:     r6 = mul r6 18446744071562067968 64
-; CHECK-NEXT:     r6 = or r6 r1 64
-; CHECK-NEXT:     r12 = mul arg1 1 64
-; CHECK-NEXT:     r9 = mul r6 4 64
-; CHECK-NEXT:     r12 = add r12 r9 64
-; CHECK-NEXT:     r11 = load 4 r12 0
-; CHECK-NEXT:     r3 = udiv r11 2147483648 64
-; CHECK-NEXT:     r3 = mul r3 18446744071562067968 64
-; CHECK-NEXT:     r3 = or r3 r11 64
-; CHECK-NEXT:     call write r3
-; CHECK-NEXT:     r10 = add r1 1 32
-; CHECK-NEXT:     store 8 r10 sp 0
-; CHECK-NEXT:     br .for.cond
-; CHECK:   .for.end:
-; CHECK-NEXT:     ret 0
+; CHECK: start printArray 2:    
+
+; CHECK:     [[REG:r[0-9]+]] = udiv [[REG0:r[0-9]+]] 2147483648 64
+; CHECK-NEXT:     [[REG]] = mul [[REG]] 18446744071562067968 64
+; CHECK-NEXT:     [[REG]] = or [[REG]] [[REG0]] 64
+; CHECK-NEXT:     [[REG2:r[0-9]+]] = mul [[ARG:arg[0-9]+]] 1 64
+; CHECK-NEXT:     [[REG3:r[0-9]+]] = mul [[REG]] 4 64
+; CHECK-NEXT:     [[REG2]] = add [[REG2]] [[REG3]] 64
+
 entry:
   br label %for.cond
 
@@ -242,36 +145,6 @@ declare void @write(i64) #2
 ; Function Attrs: nounwind ssp uwtable
 define i32 @main() #0 {
 ; CHECK: start main 0:
-; CHECK:   .entry:
-; CHECK-NEXT:     ; init sp!
-; CHECK-NEXT:     sp = sub sp 64 64
-; CHECK-NEXT:     r9 = add sp 0 64
-; CHECK-NEXT:     store 4 11 r9 0
-; CHECK-NEXT:     r5 = add r9 4 64
-; CHECK-NEXT:     store 4 10 r5 0
-; CHECK-NEXT:     r8 = add r9 8 64
-; CHECK-NEXT:     store 4 12 r8 0
-; CHECK-NEXT:     r4 = add r9 12 64
-; CHECK-NEXT:     store 4 2 r4 0
-; CHECK-NEXT:     r1 = add r9 16 64
-; CHECK-NEXT:     store 4 7 r1 0
-; CHECK-NEXT:     r7 = add r9 20 64
-; CHECK-NEXT:     store 4 3 r7 0
-; CHECK-NEXT:     r16 = add r9 24 64
-; CHECK-NEXT:     store 4 8 r16 0
-; CHECK-NEXT:     r15 = add r9 28 64
-; CHECK-NEXT:     store 4 14 r15 0
-; CHECK-NEXT:     r14 = add r9 32 64
-; CHECK-NEXT:     store 4 4 r14 0
-; CHECK-NEXT:     r13 = add r9 36 64
-; CHECK-NEXT:     store 4 9 r13 0
-; CHECK-NEXT:     r12 = add r9 40 64
-; CHECK-NEXT:     store 4 15 r12 0
-; CHECK-NEXT:     r11 = add r9 44 64
-; CHECK-NEXT:     store 4 1 r11 0
-; CHECK-NEXT:     r10 = add r9 48 64
-; CHECK-NEXT:     call main.outline r10 r9
-; CHECK-NEXT:     ret 0
 entry:
   %arr = alloca [15 x i32], align 16
   %arrayidx = getelementptr inbounds [15 x i32], [15 x i32]* %arr, i64 0, i64 0
@@ -312,21 +185,6 @@ entry:
   ret i32 0
 }
 ; CHECK: end main
-; CHECK: start main.outline 2:
-; CHECK:   .newFuncRoot:
-; CHECK-NEXT:     store 4 13 arg1 0
-; CHECK-NEXT:     r16 = mul arg2 1 64
-; CHECK-NEXT:     r16 = add r16 52 64
-; CHECK-NEXT:     store 4 6 r16 0
-; CHECK-NEXT:     r15 = mul arg2 1 64
-; CHECK-NEXT:     r15 = add r15 56 64
-; CHECK-NEXT:     store 4 5 r15 0
-; CHECK-NEXT:     r14 = mul arg2 1 64
-; CHECK-NEXT:     call quickSort r14 0 14
-; CHECK-NEXT:     r12 = mul arg2 1 64
-; CHECK-NEXT:     call printArray r12 15
-; CHECK-NEXT:     ret 0
-; CHECK: end main.outline
 
 attributes #0 = { nounwind ssp uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "frame-pointer"="all" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind willreturn }
