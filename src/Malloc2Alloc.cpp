@@ -4,7 +4,7 @@
   // find all malloc call instructions in the function and check if they satisfy the condition
   // Condition 1. allocated size should be Constant. no dynamic allocation.
   // Condition 2. Size should be lower than 2048
-  void  Malloc2AllocPass::findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs) {
+  void  Malloc2AllocPass::findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs, unsigned MaxSize) {
     for(auto &BB : F) {
       for(auto &I : BB) {
         // check if the instruction I is malloc call instruction
@@ -12,9 +12,9 @@
         if(CI && (CI->getCalledFunction()->getName() == "malloc")) {
           ConstantInt *MallocSize = dyn_cast<ConstantInt>(CI->getArgOperand(0));
           // check if the size of malloc-ed block is constant && smaller than 2048.
-          if(MallocSize && MallocSize->getZExtValue() <= MAXSIZE) {
+          if(MallocSize && MallocSize->getZExtValue() <= MaxSize) {
             assert(MallocSize && "malloc instruction does not have constant argument : dynamic allocation!");
-            assert(MallocSize->getZExtValue() <= MAXSIZE && "malloc allocates more than 2048 bytes!");
+            assert(MallocSize->getZExtValue() <= MaxSize && "malloc allocates more than 2048 bytes!");
             PossibleMallocs.push_back(CI);
           }
         }
@@ -134,7 +134,6 @@
       for(Instruction *I : ReplaceableMallocs) {
           auto *CI = dyn_cast<CallInst>(I);
           auto *MallocType = (getMallocAllocatedType(CI, &TLI));
-          //if (!MallocType) continue;
           Value *MallocSize = getMallocArraySize(CI, DL, &TLI, true);
           IB.SetInsertPoint(dyn_cast<Instruction>(F.getEntryBlock().getFirstInsertionPt()));
           auto InstType = CI->getType();
@@ -146,16 +145,11 @@
   }
 
   PreservedAnalyses Malloc2AllocPass::run(Function &F, FunctionAnalysisManager &FAM) {
-
     vector<Instruction*> PossibleMallocs;
     vector<Instruction*> ReplaceableMallocs;
     vector<Instruction*> RemovableFrees;
-    //outs()<<"Function : "<<F.getName()<<"\n";
-    findPossibleMallocs(F, PossibleMallocs);
+    findPossibleMallocs(F, PossibleMallocs, MAXSIZE);
     findReplaceableMallocs(F,FAM,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
-    //for(auto I : ReplaceableMallocs) outs()<<"Replaceable malloc : "<<*I<<"\n";
-    //for(auto I : RemovableFrees) outs()<<"Removable free : "<<*I<<"\n";
     replaceMallocwithAlloc(F, FAM, ReplaceableMallocs,RemovableFrees);
-    //outs()<<"Replaced!\n";
     return PreservedAnalyses::all();
   }

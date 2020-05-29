@@ -36,7 +36,7 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
       
       // Stage 2 : find store inst that stores pointer of malloc-ed memory.
       // (This is necessary to track the pointer and remove free inst in other func)
-      for(auto *I : ReplaceableMallocs) {
+      for(auto *MI : ReplaceableMallocs) {
         // find all addresses where malloc-ed pointer is stored. 
         // put them in StoredAddrs
         vector<Value*> StoredAddrs;
@@ -48,7 +48,7 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
               SmallVector<const Value *, 4> PointerTrack;
               GetUnderlyingObjects(StoredData, PointerTrack, DL, &LI);
               for(auto *A : PointerTrack){
-                if(dyn_cast<Instruction>(A) && I == dyn_cast<Instruction>(A)) {
+                if(dyn_cast<Instruction>(A) && MI == dyn_cast<Instruction>(A)) {
                   StoresMalloc = true;
                   break;
                 }
@@ -59,18 +59,18 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
             }
           }
         }
-        ReplaceableMallocsandStoredAddr.push_back(make_pair(I,StoredAddrs));
+        ReplaceableMallocsandStoredAddr.push_back(make_pair(MI,StoredAddrs));
       }
 
       // Stage 3 : Track malloc-ed pointer to find corresponding free inst.
       // 2 ways : i) passed by argument ii) stored in global var
       // Store corresponding free inst in ShouldbeRemovedFrees
       for(auto P : ReplaceableMallocsandStoredAddr) {
-        // i) Check if pointer is passed through by argument. Store it in PassedMAllocPtrbyArg(funcName,ArgNo)
+        // i) Check if pointer is passed through by argument. Store it in PassedMallocPtrbyArg(funcName,ArgNo)
         vector<pair<Function*,unsigned int>> PassedMallocPtrbyArg;
-        for(auto &BB1 : F) {
-          for(auto &I1 : BB1) {
-            if(auto *CI = dyn_cast<CallInst>(&I1)) {
+        for(auto &BB : F) {
+          for(auto &I : BB) {
+            if(auto *CI = dyn_cast<CallInst>(&I)) {
               for(unsigned int i = 0; i < CI->getNumArgOperands(); i++) {
                 bool PassedbyArg = false;
                 SmallVector<const Value *, 4> PointerTrack;
@@ -90,16 +90,16 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
             }
           }
         }
-        for(auto &F2 :M) {
-          if(F2.empty()) continue;
+        for(auto &CheckFunc : M) {
+          if(CheckFunc.empty()) continue;
           // ii) Check if pointer is passed through by global var. Store it in LoadedMalloc
-          auto &TLI2 = FAM.getResult<TargetLibraryAnalysis>(F2);
-          auto &LI2 = FAM.getResult<LoopAnalysis>(F2);
-          auto &DL2 = F2.getParent()->getDataLayout();
+          auto &TLI2 = FAM.getResult<TargetLibraryAnalysis>(CheckFunc);
+          auto &LI2 = FAM.getResult<LoopAnalysis>(CheckFunc);
+          auto &DL2 = CheckFunc.getParent()->getDataLayout();
           vector<Instruction *> LoadedMalloc;
-          for(auto &BB2 :F2){
-            for(auto &I2 : BB2) {
-              auto *LI = dyn_cast<LoadInst>(&I2);
+          for(auto &BB : CheckFunc){
+            for(auto &I : BB) {
+              auto *LI = dyn_cast<LoadInst>(&I);
               if(LI && find(P.second.begin(),P.second.end(),LI->getOperand(0))!=P.second.end()){
                 //found use of malloc-ed ptr
                 LoadedMalloc.push_back(LI);
@@ -107,12 +107,12 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
             }
           }
           // iii) Now check if there is free inst that frees pointers passed by PassedMAllocPtrbyArg or LoadedMalloc
-          for(auto &BB2 : F2) {
-            for(auto &I2 : BB2) {
+          for(auto &BB : CheckFunc) {
+            for(auto &I : BB) {
               bool FreesMalloc = false;
-              if(isFreeCall(&I2,&TLI2)) {
+              if(isFreeCall(&I,&TLI2)) {
                 SmallVector<const Value *, 4> PointerTrack;  
-                GetUnderlyingObjects(I2.getOperand(0),PointerTrack,DL2,&LI2);
+                GetUnderlyingObjects(I.getOperand(0),PointerTrack,DL2,&LI2);
                 for(auto *A : PointerTrack){
                   auto *UnderlyingI = dyn_cast<Instruction>(A);
                   if(UnderlyingI && find(LoadedMalloc.begin(),LoadedMalloc.end(),UnderlyingI)!=LoadedMalloc.end()) {
@@ -122,7 +122,7 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
                   auto *UnderlyingArg = dyn_cast<Argument>(A);
                   if(!UnderlyingArg) continue; 
                   for(auto &PA : PassedMallocPtrbyArg) {
-                    if(PA.first != &F2) continue;
+                    if(PA.first != &CheckFunc) continue;
                     if(PA.second == UnderlyingArg->getArgNo()) {
                       FreesMalloc = true;
                       break;
@@ -130,9 +130,7 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
                   }
                 }
               }
-              if(FreesMalloc) {
-                ShouldbeRemovedFrees.push_back(&I2);
-              }
+              if(FreesMalloc) ShouldbeRemovedFrees.push_back(&I);
             }
           }
         }
@@ -141,6 +139,5 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
       M2APass.replaceMallocwithAlloc(F,FAM,ReplaceableMallocs,ShouldbeRemovedFrees);
     }
   }
-  
   return PreservedAnalyses::all();
 }

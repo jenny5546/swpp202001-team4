@@ -84,20 +84,20 @@ int main(int argc, char **argv) {
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
   //FPM.addPass(DoNothingPass());
-  FPM.addPass(ArithmeticPass());
+  FPM.addPass(SimplifyCFGPass());
   FPM.addPass(GVN());
   FPM.addPass(DCEPass());
-  FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(ArithmeticPass());
   FPM.addPass(Malloc2AllocPass());
+  FPM.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
   MPM.addPass(FunctionOutlinePass());
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
-  MPM.addPass(Malloc2AllocinMainPass());
+  
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
   
-
   // Run!
   MPM.run(*M, MAM);
 
