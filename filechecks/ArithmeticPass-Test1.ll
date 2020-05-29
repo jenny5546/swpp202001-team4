@@ -7,17 +7,9 @@ target triple = "x86_64-apple-macosx10.14.0"
 define i32 @doAddSub(i64 %x, i64 %y) #0 {
 ; CHECK: start doAddSub 2:
 entry:
-; CHECK: sp = sub sp 24 64
-; CHECK-NEXT: r1 = mul arg1 2 64
-; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = load 8 sp 0
-; CHECK-NEXT: r1 = add r1 0 64
-; CHECK-NEXT: store 8 r1 sp 8
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = and r1 4294967295 64
-; CHECK-NEXT: store 8 r1 sp 16
-; CHECK-NEXT: r1 = load 8 sp 16
-; CHECK-NEXT: ret r1
+; CHECK: .entry:
+; CHECK: mul
+; CHECK-NOT: sub
   %add = add i64 %x, %x
   %sub = sub i64 %y, %y
   %add1 = add i64 %add, %sub
@@ -36,23 +28,6 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 define i32 @main() #0 {
 ; CHECK: start main 0:
 entry:
-; CHECK: sp = sub sp 32 64
-; CHECK-NEXT: r1 = call read
-; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = call read
-; CHECK-NEXT: store 8 r1 sp 8
-; CHECK-NEXT: r1 = load 8 sp 0
-; CHECK-NEXT: r2 = load 8 sp 8
-; CHECK-NEXT: r1 = call doAddSub r1 r2
-; CHECK-NEXT: store 8 r1 sp 16
-; CHECK-NEXT: r1 = load 8 sp 16
-; CHECK-NEXT: r2 = and r1 2147483648 64
-; CHECK-NEXT: r2 = sub 0 r2 64
-; CHECK-NEXT: r1 = or r2 r1 64
-; CHECK-NEXT: store 8 r1 sp 24
-; CHECK-NEXT: r1 = load 8 sp 24
-; CHECK-NEXT: call write r1
-; CHECK-NEXT: ret 0
   %call = call i64 (...) @read()
   %call1 = call i64 (...) @read()
   %call2 = call i32 @doAddSub(i64 %call, i64 %call1)
