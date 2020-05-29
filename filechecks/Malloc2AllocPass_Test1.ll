@@ -5,45 +5,10 @@ target triple = "x86_64-unknown-linux-gnu"
 
 ; Function Attrs: nounwind uwtable
 define dso_local void @test1() #0 {
-; CHECK: start test1 0:
-; CHECK-NEXT: .entry:
-; CHECK-NEXT: ; init sp!
-; CHECK-NEXT: sp = sub sp 104 64
-; CHECK-NEXT: r1 = add sp 72 64
-; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = load 8 sp 0
-; CHECK-NEXT: store 8 r1 sp 8
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: store 8 r1 sp 16
-; CHECK-NEXT: r2 = load 8 sp 16
-; CHECK-NEXT: store 8 0 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 8 64
-; CHECK-NEXT: store 8 r1 sp 24
-; CHECK-NEXT: r2 = load 8 sp 24
-; CHECK-NEXT: store 8 1 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 16 64
-; CHECK-NEXT: store 8 r1 sp 32
-; CHECK-NEXT: r2 = load 8 sp 32
-; CHECK-NEXT: store 8 2 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 24 64
-; CHECK-NEXT: store 8 r1 sp 40
-; CHECK-NEXT: r2 = load 8 sp 40
-; CHECK-NEXT: store 8 3 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 24 64
-; CHECK-NEXT: store 8 r1 sp 48
-; CHECK-NEXT: r1 = load 8 sp 48
-; CHECK-NEXT: r1 = load 8 r1 0
-; CHECK-NEXT: store 8 r1 sp 56
-; CHECK-NEXT: r1 = load 8 sp 56
-; CHECK-NEXT: call write r1
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: store 8 r1 sp 64
-; CHECK-NEXT: ret 0
-; CHECK-NEXT: end test1
+; CHECK-LABEL: test1
+; CHECK-NOT: malloc
+; CHECK-NOT: free
+
 
 entry:
   %call = call noalias i8* @malloc(i64 32) #4
@@ -80,43 +45,8 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 
 ; Function Attrs: nounwind uwtable
 define dso_local void @test2() #0 {
-; CHECK: start test2 0:
-; CHECK-NEXT: .entry:
-; CHECK-NEXT: ; init sp!
-; CHECK-NEXT: sp = sub sp 64 64
-; CHECK-NEXT: r1 = malloc 32
-; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = load 8 sp 0
-; CHECK-NEXT: store 8 r1 sp 8
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: store 8 r1 sp 16
-; CHECK-NEXT: r2 = load 8 sp 16
-; CHECK-NEXT: store 8 4 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 8 64
-; CHECK-NEXT: store 8 r1 sp 24
-; CHECK-NEXT: r2 = load 8 sp 24
-; CHECK-NEXT: store 8 5 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 16 64
-; CHECK-NEXT: store 8 r1 sp 32
-; CHECK-NEXT: r2 = load 8 sp 32
-; CHECK-NEXT: store 8 6 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 24 64
-; CHECK-NEXT: store 8 r1 sp 40
-; CHECK-NEXT: r2 = load 8 sp 40
-; CHECK-NEXT: store 8 7 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 24 64
-; CHECK-NEXT: store 8 r1 sp 48
-; CHECK-NEXT: r1 = load 8 sp 48
-; CHECK-NEXT: r1 = load 8 r1 0
-; CHECK-NEXT: store 8 r1 sp 56
-; CHECK-NEXT: r1 = load 8 sp 56
-; CHECK-NEXT: call write r1
-; CHECK-NEXT: ret 0
-; CHECK-NEXT: end test2
+; CHECK-LABEL: test2
+; CHECK: malloc
 
 entry:
   %call = call noalias i8* @malloc(i64 32) #4
@@ -137,44 +67,8 @@ entry:
 
 ; Function Attrs: nounwind uwtable
 define dso_local i64* @test3() #0 {
-; CHECK: start test3 0:
-; CHECK-NEXT: .entry:
-; CHECK-NEXT: ; init sp!
-; CHECK-NEXT: sp = sub sp 64 64
-; CHECK-NEXT: r1 = malloc 32
-; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = load 8 sp 0
-; CHECK-NEXT: store 8 r1 sp 8
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: store 8 r1 sp 16
-; CHECK-NEXT: r2 = load 8 sp 16
-; CHECK-NEXT: store 8 8 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 8 64
-; CHECK-NEXT: store 8 r1 sp 24
-; CHECK-NEXT: r2 = load 8 sp 24
-; CHECK-NEXT: store 8 9 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 16 64
-; CHECK-NEXT: store 8 r1 sp 32
-; CHECK-NEXT: r2 = load 8 sp 32
-; CHECK-NEXT: store 8 10 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 24 64
-; CHECK-NEXT: store 8 r1 sp 40
-; CHECK-NEXT: r2 = load 8 sp 40
-; CHECK-NEXT: store 8 11 r2 0
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: r1 = add r1 24 64
-; CHECK-NEXT: store 8 r1 sp 48
-; CHECK-NEXT: r1 = load 8 sp 48
-; CHECK-NEXT: r1 = load 8 r1 0
-; CHECK-NEXT: store 8 r1 sp 56
-; CHECK-NEXT: r1 = load 8 sp 56
-; CHECK-NEXT: call write r1
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: ret r1
-; CHECK-NEXT: end test3
+; CHECK-LABEL: test3
+; CHECK: malloc
 
 entry:
   %call = call noalias i8* @malloc(i64 32) #4
@@ -195,20 +89,8 @@ entry:
 
 ; Function Attrs: nounwind uwtable
 define dso_local i32 @main() #0 {
-; CHECK: start main 0:
-; CHECK-NEXT: .entry:
-; CHECK-NEXT: ; init sp!
-; CHECK-NEXT: sp = sub sp 16 64
-; CHECK-NEXT: call test1
-; CHECK-NEXT: call test2
-; CHECK-NEXT: r1 = call test3
-; CHECK-NEXT: store 8 r1 sp 0
-; CHECK-NEXT: r1 = load 8 sp 0
-; CHECK-NEXT: store 8 r1 sp 8
-; CHECK-NEXT: r1 = load 8 sp 8
-; CHECK-NEXT: free r1
-; CHECK-NEXT: ret 0
-; CHECK-NEXT: end main
+; CHECK-LABEL: main
+; CHECK: free
 
 entry:
   call void @test1()
