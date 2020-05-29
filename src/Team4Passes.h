@@ -2,7 +2,10 @@
 #define TEAM4PASSES_H
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
+#include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/OrderedInstructions.h"
 #include "llvm/Analysis/TargetFolder.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -24,6 +27,11 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Scalar/LICM.h"
+#include "llvm/Transforms/Scalar/LoopDeletion.h"
+#include "llvm/Transforms/Scalar/LoopInstSimplify.h"
+#include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
+#include "llvm/Transforms/Scalar/LoopUnrollPass.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
@@ -111,7 +119,6 @@ private:
   void saveTempInst(Instruction *OldI, Value *Res);
   void evictTempInst(Instruction *I);
   bool getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS);
-  
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId);
 
   /* after-depromotion clean-up functions */
@@ -155,7 +162,7 @@ public:
   void visitBranchInst(BranchInst &BI);
   void visitSwitchInst(SwitchInst &SI);
   void processPHIsInSuccessor(BasicBlock *Succ, BasicBlock *BBFrom);
-  
+
   /* phi */
   void visitPHINode(PHINode &PN);
 
@@ -163,4 +170,4 @@ public:
   void dumpToStdOut();
 };
 
-#endif
+#endif 

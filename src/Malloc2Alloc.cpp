@@ -133,10 +133,12 @@
       // Replace malloc call instructions with alloc instructions
       for(Instruction *I : ReplaceableMallocs) {
           auto *CI = dyn_cast<CallInst>(I);
-          Type *MallocType = getMallocAllocatedType(CI, &TLI);
+          auto *MallocType = (getMallocAllocatedType(CI, &TLI));
+          //if (!MallocType) continue;
           Value *MallocSize = getMallocArraySize(CI, DL, &TLI, true);
           IB.SetInsertPoint(dyn_cast<Instruction>(F.getEntryBlock().getFirstInsertionPt()));
-          Value *Alloca = IB.CreateAlloca(MallocType, MallocSize);
+          auto InstType = CI->getType();
+          Value *Alloca = IB.CreateBitCast(IB.CreateAlloca(MallocType, MallocSize),InstType);
           Alloca->takeName(CI);
           CI->replaceAllUsesWith(Alloca);
           CI->eraseFromParent();
@@ -148,10 +150,12 @@
     vector<Instruction*> PossibleMallocs;
     vector<Instruction*> ReplaceableMallocs;
     vector<Instruction*> RemovableFrees;
-
+    //outs()<<"Function : "<<F.getName()<<"\n";
     findPossibleMallocs(F, PossibleMallocs);
     findReplaceableMallocs(F,FAM,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
+    //for(auto I : ReplaceableMallocs) outs()<<"Replaceable malloc : "<<*I<<"\n";
+    //for(auto I : RemovableFrees) outs()<<"Removable free : "<<*I<<"\n";
     replaceMallocwithAlloc(F, FAM, ReplaceableMallocs,RemovableFrees);
-
+    //outs()<<"Replaced!\n";
     return PreservedAnalyses::all();
   }
