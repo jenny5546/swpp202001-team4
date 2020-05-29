@@ -10,11 +10,12 @@
   
   It converts all malloc inst in main function to alloca (heap -> stack) and replace all uses.
   (using Malloc2AllocPass)
-  It trakcs the use of malloc-ed pointer in other functions and if it is freed, remove that free inst.
+  It tracks the use of malloc-ed pointer in other functions and if it is freed, remove that free inst.
   
   ** Malloc2AllocPass and GVNPass must be run before this pass to 
   be guaranteed that all unnecessary store/load is gone.
 */
+#define MAXSIZE 2048
 
 PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &MAM){
   auto M2APass = Malloc2AllocPass();
@@ -31,7 +32,7 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
       auto &DL = F.getParent()->getDataLayout();
 
       // Stage 1 : find Malloc inst in main function and store in ReplaceableMallocs
-      M2APass.findPossibleMallocs(F, ReplaceableMallocs);
+      M2APass.findPossibleMallocs(F, ReplaceableMallocs, MAXSIZE);
       
       // Stage 2 : find store inst that stores pointer of malloc-ed memory.
       // (This is necessary to track the pointer and remove free inst in other func)
@@ -91,7 +92,7 @@ PreservedAnalyses Malloc2AllocinMainPass::run(Module &M, ModuleAnalysisManager &
         }
         for(auto &F2 :M) {
           if(F2.empty()) continue;
-          // ii) Check if poiter is passed through by global var. Store it in LoadedMalloc
+          // ii) Check if pointer is passed through by global var. Store it in LoadedMalloc
           auto &TLI2 = FAM.getResult<TargetLibraryAnalysis>(F2);
           auto &LI2 = FAM.getResult<LoopAnalysis>(F2);
           auto &DL2 = F2.getParent()->getDataLayout();
