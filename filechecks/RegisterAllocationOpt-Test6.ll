@@ -45,7 +45,6 @@ for.cond.cleanup7:                                ; preds = %for.cond5
   br label %for.end43
 
 for.body8:                                        ; preds = %for.cond5
-; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
  br label %for.cond9
 
 for.cond9:                                        ; preds = %for.inc, %for.body8
@@ -141,7 +140,6 @@ for.inc47:                                        ; preds = %for.end46
 for.end49:                                        ; preds = %for.cond.cleanup
   ret void
 }
-; CHECK: end convolution
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1
@@ -275,7 +273,6 @@ for.inc35:                                        ; preds = %for.end34
 for.end37:                                        ; preds = %for.cond.cleanup22
   ret i32 0
 }
-; CHECK: end main
 
 declare i64 @read(...) #2
 

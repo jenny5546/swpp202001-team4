@@ -30,7 +30,6 @@ for.end:                                          ; preds = %for.cond.cleanup
   call void @write(i64 10)
   ret void
 }
-; CHECK: end print_bit
 
 define i32 @main() #0 {
 ; CHECK: start main 0:
@@ -42,7 +41,6 @@ entry:
   call void @print_bit(i64 %call)
   ret i32 0
 }
-; CHECK: end main
 
 declare i64 @read(...) #2
 declare void @write(i64) #2

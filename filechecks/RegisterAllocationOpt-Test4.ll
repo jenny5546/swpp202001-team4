@@ -102,7 +102,6 @@ for.end28:                                        ; preds = %for.cond
   call void @write(i64 %f.0)
   ret i32 0
 }
-; CHECK: end main
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1

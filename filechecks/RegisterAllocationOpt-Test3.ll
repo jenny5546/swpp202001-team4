@@ -213,7 +213,6 @@ for.inc55:                                        ; preds = %for.body54
 for.end57:                                        ; preds = %for.cond.cleanup53
   ret i32 0
 }
-; CHECK:   end main
 
 declare i64 @read(...) #2
 declare void @write(i64) #2

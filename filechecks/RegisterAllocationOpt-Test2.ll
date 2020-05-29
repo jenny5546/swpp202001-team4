@@ -111,7 +111,6 @@ entry:
   call void @write(i64 %add49)
   ret i32 0
 }
-; CHECK: end main
 
 declare i64 @read(...) #2
 declare void @write(i64) #2

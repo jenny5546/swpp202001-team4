@@ -13,7 +13,6 @@ entry:
   store i32 %0, i32* %a, align 4
   ret void
 }
-; CHECK: end swap
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1
@@ -82,7 +81,6 @@ for.end:                                          ; preds = %for.cond.cleanup
   %add14 = add nsw i32 %i.0, 1
   ret i32 %add14
 }
-; CHECK: end partition
 
 ; Function Attrs: nounwind ssp uwtable
 define void @quickSort(i32* %arr, i32 %low, i32 %high) #0 {
@@ -102,17 +100,13 @@ if.then:                                          ; preds = %entry
 if.end:                                           ; preds = %if.then, %entry
   ret void
 }
-; CHECK: end quickSort
 
 ; Function Attrs: nounwind ssp uwtable
 define void @printArray(i32* %arr, i32 %size) #0 {
 ; CHECK: start printArray 2:    
 
-; CHECK:     [[REG:r[0-9]+]] = udiv [[REG0:r[0-9]+]] 2147483648 64
-; CHECK-NEXT:     [[REG]] = mul [[REG]] 18446744071562067968 64
-; CHECK-NEXT:     [[REG]] = or [[REG]] [[REG0]] 64
-; CHECK-NEXT:     [[REG2:r[0-9]+]] = mul [[ARG:arg[0-9]+]] 1 64
-; CHECK-NEXT:     [[REG3:r[0-9]+]] = mul [[REG]] 4 64
+; CHECK:     [[REG2:r[0-9]+]] = mul [[ARG:arg[0-9]+]] 1 64
+; CHECK-NEXT:     [[REG3:r[0-9]+]] = mul [[REG:r[0-9]+]] 4 64
 ; CHECK-NEXT:     [[REG2]] = add [[REG2]] [[REG3]] 64
 
 entry:
@@ -138,7 +132,6 @@ for.inc:                                          ; preds = %for.body
 for.end:                                          ; preds = %for.cond
   ret void
 }
-; CHECK: end printArray
 
 declare void @write(i64) #2
 
@@ -184,7 +177,6 @@ entry:
   call void @printArray(i32* %arraydecay15, i32 15)
   ret i32 0
 }
-; CHECK: end main
 
 attributes #0 = { nounwind ssp uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "frame-pointer"="all" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind willreturn }
