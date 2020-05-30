@@ -105,6 +105,7 @@ private:
   map<Instruction *, unsigned> RegToRegMap;  // permanent register user to register number
   map<Instruction *, AllocaInst *> RegToAllocaMap;
   vector<pair<Instruction *, pair<Value *, unsigned>>> TempRegUsers; // temporary users
+  map<Instruction *, bool> Evictions;
 
   void raiseError(Instruction &I);
 
@@ -115,7 +116,7 @@ private:
 
   /* assembly allocation and management */
   string assemblyRegisterName(unsigned registerId);
-  string retrieveAssemblyRegister(Instruction *I);
+  string retrieveAssemblyRegister(Instruction *I, vector<Value*> *Ops = nullptr);
   Value *emitLoadFromSrcRegister(Instruction *I, unsigned targetRegisterId);
   void emitStoreToSrcRegister(Value *V, Instruction *I);
 
@@ -124,11 +125,12 @@ private:
   void saveTempInst(Instruction *OldI, Value *Res);
   void evictTempInst(Instruction *I);
   bool getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS);
-  
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId);
 
   /* after-depromotion clean-up functions */
   void resolveRegDependency();
+  void removeExtraMemoryInsts();
+  void cleanRedundantCasts();
 
 public:
   Module *getDepromotedModule() const;

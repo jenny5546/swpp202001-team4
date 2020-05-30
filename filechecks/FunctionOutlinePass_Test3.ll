@@ -7,27 +7,7 @@ target triple = "x86_64-apple-macosx10.14.0"
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @fibMultiplier(i32 %n) #0 {
-;CHECK:    start fibMultiplier 1:
-;CHECK-NEXT:      .entry:
-;CHECK-NEXT:        ; init sp!
-;CHECK-NEXT:        sp = sub sp 32 64
-;CHECK-NEXT:        r1 = sub arg1 1 32
-;CHECK-NEXT:        store 8 r1 sp 0
-;CHECK-NEXT:        r1 = load 8 sp 0
-;CHECK-NEXT:        r2 = and r1 2147483648 64
-;CHECK-NEXT:        r2 = sub 0 r2 64
-;CHECK-NEXT:        r1 = or r2 r1 64
-;CHECK-NEXT:        store 8 r1 sp 8
-;CHECK-NEXT:        r2 = load 8 sp 8
-;CHECK-NEXT:        r2 = mul r2 4 64
-;CHECK-NEXT:        r1 = add 20480 r2 64
-;CHECK-NEXT:        store 8 r1 sp 16
-;CHECK-NEXT:        r1 = load 8 sp 16
-;CHECK-NEXT:        r1 = load 4 r1 0
-;CHECK-NEXT:        store 8 r1 sp 24
-;CHECK-NEXT:        r1 = load 8 sp 24
-;CHECK-NEXT:        ret r1
-;CHECK-NEXT:    end fibMultiplier
+; CHECK: start fibMultiplier 1:
 entry:
   %sub = sub nsw i32 %n, 1
   %idxprom = sext i32 %sub to i64
@@ -38,32 +18,13 @@ entry:
 
 ; Function Attrs: nounwind ssp uwtable
 define i32 @main() #0 {
+; CHECK: start main 0:
 entry:
-;CHECK:    .entry:
-;CHECK-NEXT:        ; init sp!
-;CHECK-NEXT:        sp = sub sp 184 64
-;CHECK-NEXT:        r1 = malloc 40
-;CHECK-NEXT:        store 8 20480 sp 0
-;CHECK-NEXT:        r2 = load 8 sp 0
-;CHECK-NEXT:        store 4 1 r2 0
-;CHECK-NEXT:        store 8 20484 sp 8
-;CHECK-NEXT:        r2 = load 8 sp 8
-;CHECK-NEXT:        store 4 1 r2 0
-;CHECK-NEXT:        store 8 2 sp 24
-;CHECK-NEXT:        r1 = load 8 sp 24
-;CHECK-NEXT:        store 8 r1 sp 16
-;CHECK-NEXT:        br .for.cond
   store i32 1, i32* getelementptr inbounds ([10 x i32], [10 x i32]* @arr, i64 0, i64 0), align 16
   store i32 1, i32* getelementptr inbounds ([10 x i32], [10 x i32]* @arr, i64 0, i64 1), align 4
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry
-;CHECK:    .for.cond:
-;CHECK-NEXT:    r1 = load 8 sp 16
-;CHECK-NEXT:    r1 = icmp slt r1 10 32
-;CHECK-NEXT:    store 8 r1 sp 32
-;CHECK-NEXT:    r1 = load 8 sp 32
-;CHECK-NEXT:    br r1 .for.body .for.end
   %i.0 = phi i32 [ 2, %entry ], [ %inc, %for.inc ]
   %cmp = icmp slt i32 %i.0, 10
   br i1 %cmp, label %for.body, label %for.cond.cleanup
@@ -72,67 +33,6 @@ for.cond.cleanup:                                 ; preds = %for.cond
   br label %for.end
 
 for.body:                                         ; preds = %for.cond
-;CHECK:    r1 = load 8 sp 16
-;CHECK-NEXT:    r1 = sub r1 2 32
-;CHECK-NEXT:    store 8 r1 sp 40
-;CHECK-NEXT:    r1 = load 8 sp 40
-;CHECK-NEXT:    r2 = and r1 2147483648 64
-;CHECK-NEXT:    r2 = sub 0 r2 64
-;CHECK-NEXT:    r1 = or r2 r1 64
-;CHECK-NEXT:    store 8 r1 sp 48
-;CHECK-NEXT:    r2 = load 8 sp 48
-;CHECK-NEXT:    r2 = mul r2 4 64
-;CHECK-NEXT:    r1 = add 20480 r2 64
-;CHECK-NEXT:    store 8 r1 sp 56
-;CHECK-NEXT:    r1 = load 8 sp 56
-;CHECK-NEXT:    r1 = load 4 r1 0
-;CHECK-NEXT:    store 8 r1 sp 64
-;CHECK-NEXT:    r1 = load 8 sp 16
-;CHECK-NEXT:    r1 = sub r1 1 32
-;CHECK-NEXT:    store 8 r1 sp 72
-;CHECK-NEXT:    r1 = load 8 sp 72
-;CHECK-NEXT:    r2 = and r1 2147483648 64
-;CHECK-NEXT:    r2 = sub 0 r2 64
-;CHECK-NEXT:    r1 = or r2 r1 64
-;CHECK-NEXT:    store 8 r1 sp 80
-;CHECK-NEXT:    r2 = load 8 sp 80
-;CHECK-NEXT:    r2 = mul r2 4 64
-;CHECK-NEXT:    r1 = add 20480 r2 64
-;CHECK-NEXT:    store 8 r1 sp 88
-;CHECK-NEXT:    r1 = load 8 sp 88
-;CHECK-NEXT:    r1 = load 4 r1 0
-;CHECK-NEXT:    store 8 r1 sp 96
-;CHECK-NEXT:    r1 = load 8 sp 64
-;CHECK-NEXT:    r2 = load 8 sp 96
-;CHECK-NEXT:    r1 = mul r1 r2 32
-;CHECK-NEXT:    store 8 r1 sp 104
-;CHECK-NEXT:    r1 = load 8 sp 16
-;CHECK-NEXT:    r2 = and r1 2147483648 64
-;CHECK-NEXT:    r2 = sub 0 r2 64
-;CHECK-NEXT:    r1 = or r2 r1 64
-;CHECK-NEXT:    store 8 r1 sp 112
-;CHECK-NEXT:    r2 = load 8 sp 112
-;CHECK-NEXT:    r2 = mul r2 4 64
-;CHECK-NEXT:    r1 = add 20480 r2 64
-;CHECK-NEXT:    store 8 r1 sp 120
-;CHECK-NEXT:    r1 = load 8 sp 120
-;CHECK-NEXT:    r1 = load 4 r1 0
-;CHECK-NEXT:    store 8 r1 sp 128
-;CHECK-NEXT:    r1 = load 8 sp 128
-;CHECK-NEXT:    r2 = load 8 sp 104
-;CHECK-NEXT:    r1 = add r1 r2 32
-;CHECK-NEXT:    store 8 r1 sp 136
-;CHECK-NEXT:    r1 = load 8 sp 136
-;CHECK-NEXT:    r2 = load 8 sp 120
-;CHECK-NEXT:    store 4 r1 r2 0
-;CHECK-NEXT:    r1 = load 8 sp 16
-;CHECK-NEXT:    r1 = add r1 1 32
-;CHECK-NEXT:    store 8 r1 sp 144
-;CHECK-NEXT:    r1 = load 8 sp 144
-;CHECK-NEXT:    store 8 r1 sp 24
-;CHECK-NEXT:    r1 = load 8 sp 24
-;CHECK-NEXT:    store 8 r1 sp 16
-;CHECK-NEXT:    br .for.cond
   %sub = sub nsw i32 %i.0, 2
   %idxprom = sext i32 %sub to i64
   %arrayidx = getelementptr inbounds [10 x i32], [10 x i32]* @arr, i64 0, i64 %idxprom
@@ -154,23 +54,6 @@ for.inc:                                          ; preds = %for.body
   br label %for.cond
 
 for.end:                                          ; preds = %for.cond.cleanup
-;CHECK:    r1 = call read
-;CHECK-NEXT:    store 8 r1 sp 152
-;CHECK-NEXT:    r1 = load 8 sp 152
-;CHECK-NEXT:    r1 = and r1 4294967295 64
-;CHECK-NEXT:    store 8 r1 sp 160
-;CHECK-NEXT:    r1 = load 8 sp 160
-;CHECK-NEXT:    r1 = call fibMultiplier r1
-;CHECK-NEXT:    store 8 r1 sp 168
-;CHECK-NEXT:    r1 = load 8 sp 168
-;CHECK-NEXT:    r2 = and r1 2147483648 64
-;CHECK-NEXT:    r2 = sub 0 r2 64
-;CHECK-NEXT:    r1 = or r2 r1 64
-;CHECK-NEXT:    store 8 r1 sp 176
-;CHECK-NEXT:    r1 = load 8 sp 176
-;CHECK-NEXT:    call write r1
-;CHECK-NEXT:    ret 0
-;CHECK-NEXT:    end main
   %call = call i64 (...) @read()
   %conv = trunc i64 %call to i32
   %call6 = call i32 @fibMultiplier(i32 %conv)
@@ -178,6 +61,10 @@ for.end:                                          ; preds = %for.cond.cleanup
   call void @write(i64 %conv7)
   ret i32 0
 }
+
+; CHECK:  start main.for.body [[SCOPE:[0-10]+]]:
+; CHECK-NEXT: .newFuncRoot:
+; CHECK:  end main.for.body
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1
