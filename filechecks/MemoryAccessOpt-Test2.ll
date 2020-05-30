@@ -9,7 +9,9 @@ define i32 @main() #0 {
 entry:
 ; CHECK: reset heap
 ; CHECK: reset stack
+  %a = alloca i64, align 8
   %arr = alloca [3 x i32], align 4
+  store i64 0, i64* %a, align 8
   %conv = sext i32 24 to i64
   %mul = mul i64 %conv, 8
   %call = call noalias i8* @malloc(i64 %mul) #3
@@ -19,6 +21,7 @@ entry:
   %call3 = call noalias i8* @malloc(i64 %mul2) #3
   %arrayidx = getelementptr inbounds i8*, i8** %0, i64 0
   store i8* %call3, i8** %arrayidx, align 8
+  store i64 0, i64* %a, align 8  
   %conv4 = trunc i32 24 to i8
   %arrayidx5 = getelementptr inbounds i8*, i8** %0, i64 0
   %1 = load i8*, i8** %arrayidx5, align 8

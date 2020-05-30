@@ -27,6 +27,7 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/LICM.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
 #include "llvm/Transforms/Scalar/LoopInstSimplify.h"
@@ -53,10 +54,15 @@ using namespace llvm::PatternMatch;
 
 class Malloc2AllocPass : public llvm::PassInfoMixin<Malloc2AllocPass> {
 public:
-    void findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs);
+    void findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs, unsigned MaxSize);
     void findReplaceableMallocs(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> &PossibleMallocs, vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees);
     void replaceMallocwithAlloc(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees);
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
+};
+
+class Malloc2AllocinMainPass : public llvm::PassInfoMixin<Malloc2AllocinMainPass> {
+public:
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
 class FunctionOutlinePass : public llvm::PassInfoMixin<FunctionOutlinePass> {
@@ -170,4 +176,8 @@ public:
   void dumpToStdOut();
 };
 
+<<<<<<< HEAD
+#endif
+=======
 #endif 
+>>>>>>> upstream/master
