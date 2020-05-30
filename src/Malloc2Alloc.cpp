@@ -148,7 +148,9 @@
     vector<Instruction*> PossibleMallocs;
     vector<Instruction*> ReplaceableMallocs;
     vector<Instruction*> RemovableFrees;
+
     findPossibleMallocs(F, PossibleMallocs, MAXSIZE);
+
     findReplaceableMallocs(F,FAM,PossibleMallocs,ReplaceableMallocs,RemovableFrees);
     replaceMallocwithAlloc(F, FAM, ReplaceableMallocs,RemovableFrees);
     return PreservedAnalyses::all();

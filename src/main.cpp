@@ -109,12 +109,12 @@ int main(int argc, char **argv) {
   FPM.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
-  MPM.addPass(FunctionOutlinePass());
+  MPM.addPass(FunctionOutlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
   
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
-  
+
   // Run!
   MPM.run(*M, MAM);
 

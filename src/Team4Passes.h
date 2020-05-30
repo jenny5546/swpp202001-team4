@@ -168,7 +168,7 @@ public:
   void visitBranchInst(BranchInst &BI);
   void visitSwitchInst(SwitchInst &SI);
   void processPHIsInSuccessor(BasicBlock *Succ, BasicBlock *BBFrom);
-  
+
   /* phi */
   void visitPHINode(PHINode &PN);
 
@@ -176,4 +176,8 @@ public:
   void dumpToStdOut();
 };
 
+<<<<<<< HEAD
 #endif
+=======
+#endif 
+>>>>>>> upstream/master
