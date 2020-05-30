@@ -176,8 +176,4 @@ public:
   void dumpToStdOut();
 };
 
-<<<<<<< HEAD
 #endif
-=======
-#endif 
->>>>>>> upstream/master
