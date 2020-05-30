@@ -9,11 +9,14 @@ define i32 @main() #0 {
 entry:
 ; CHECK: reset heap
 ; CHECK: reset stack
+  %a = alloca i64
   %hi = alloca [3 x i32], align 4
+  store i64 0, i64* %a
   %call = call noalias i8* @malloc(i64 32) #4
   %0 = bitcast i8* %call to i32*
   %arrayidx = getelementptr inbounds i32, i32* %0, i64 3
   store i32 0, i32* %arrayidx, align 4
+  store i64 0, i64* %a
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry

@@ -89,7 +89,6 @@ int main(int argc, char **argv) {
   LoopPassManager LPM2;
   LPM2.addPass(LoopDeletionPass());
 
-
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
   //FPM.addPass(DoNothingPass());
@@ -99,7 +98,11 @@ int main(int argc, char **argv) {
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
   FPM.addPass(LoopUnrollPass());
 
+  FunctionPassManager FPM;
+  // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
+  //FPM.addPass(DoNothingPass());
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(GVN());
   FPM.addPass(DCEPass());
   FPM.addPass(ArithmeticPass());
   FPM.addPass(Malloc2AllocPass());
@@ -109,7 +112,7 @@ int main(int argc, char **argv) {
   MPM.addPass(FunctionOutlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
-
+  
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
 
   // Run!
