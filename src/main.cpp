@@ -81,21 +81,39 @@ int main(int argc, char **argv) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
+  LoopPassManager LPM1;
+  LPM1.addPass(LoopInstSimplifyPass());
+  LPM1.addPass(LoopSimplifyCFGPass());
+  LPM1.addPass(LICMPass());
+  
+  LoopPassManager LPM2;
+  LPM2.addPass(LoopDeletionPass());
+
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
   //FPM.addPass(DoNothingPass());
-  FPM.addPass(ArithmeticPass());
-  FPM.addPass(DCEPass());
+  FPM.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
+  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
+  FPM.addPass(LoopUnrollPass());
+
+  FunctionPassManager FPM;
+  // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
+  //FPM.addPass(DoNothingPass());
+  FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(GVN());
+  FPM.addPass(DCEPass());
+  FPM.addPass(ArithmeticPass());
   FPM.addPass(Malloc2AllocPass());
+  FPM.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
-  MPM.addPass(FunctionOutlinePass());
+  MPM.addPass(FunctionOutlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
-
-  MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
   
+  MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
 
   // Run!
   MPM.run(*M, MAM);

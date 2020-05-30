@@ -2,7 +2,10 @@
 #define TEAM4PASSES_H
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
+#include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/OrderedInstructions.h"
 #include "llvm/Analysis/TargetFolder.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -24,15 +27,26 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/LICM.h"
+#include "llvm/Transforms/Scalar/LoopDeletion.h"
+#include "llvm/Transforms/Scalar/LoopInstSimplify.h"
+#include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
+#include "llvm/Transforms/Scalar/LoopUnrollPass.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/IR/Use.h"
+#include "llvm/IR/Value.h"
 
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <sstream>
 #include <vector>
+#include <regex>
+#include <set>
 
 using namespace std;
 using namespace llvm;
@@ -40,14 +54,21 @@ using namespace llvm::PatternMatch;
 
 class Malloc2AllocPass : public llvm::PassInfoMixin<Malloc2AllocPass> {
 public:
-    void findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs);
+    void findPossibleMallocs(Function &F, vector<Instruction*> &PossibleMallocs, unsigned MaxSize);
     void findReplaceableMallocs(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> &PossibleMallocs, vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees);
     void replaceMallocwithAlloc(Function &F, FunctionAnalysisManager &FAM, vector<Instruction*> &ReplaceableMallocs, vector<Instruction*> &RemovableFrees);
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
 
+class Malloc2AllocinMainPass : public llvm::PassInfoMixin<Malloc2AllocinMainPass> {
+public:
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+};
+
 class FunctionOutlinePass : public llvm::PassInfoMixin<FunctionOutlinePass> {
 public:
+    bool isOutlinedArgs(const BasicBlock *Block, Value *V);
+    unsigned countOutlinedArgs(BasicBlock *Block, vector<Value *> funcArgs);
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
@@ -104,7 +125,6 @@ private:
   void saveTempInst(Instruction *OldI, Value *Res);
   void evictTempInst(Instruction *I);
   bool getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &BasicBlockBFS);
-  
   Value *translateSrcOperandToTgt(Value *V, unsigned OperandId);
 
   /* after-depromotion clean-up functions */
@@ -148,7 +168,7 @@ public:
   void visitBranchInst(BranchInst &BI);
   void visitSwitchInst(SwitchInst &SI);
   void processPHIsInSuccessor(BasicBlock *Succ, BasicBlock *BBFrom);
-  
+
   /* phi */
   void visitPHINode(PHINode &PN);
 
