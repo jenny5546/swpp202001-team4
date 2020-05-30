@@ -98,9 +98,6 @@ int main(int argc, char **argv) {
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
   FPM.addPass(LoopUnrollPass());
 
-  FunctionPassManager FPM;
-  // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
-  //FPM.addPass(DoNothingPass());
   FPM.addPass(SimplifyCFGPass());
   FPM.addPass(GVN());
   FPM.addPass(DCEPass());
