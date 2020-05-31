@@ -38,7 +38,8 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
             for (auto &I : BB){
                 if (auto *CI = dyn_cast<CallInst>(&I)){
                     Function *calledfunc = CI->getCalledFunction();
-                    if (instsInFunc(*calledfunc)<15 && instsInFunc(F)<15)
+                    // if (instsInFunc(*calledfunc)<15)
+                    if (instsInFunc(*calledfunc)<20 && instsInFunc(F)<20)
                         CalledFunctions.push_back(calledfunc);
                 }
             }
@@ -49,7 +50,8 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
 
         SmallSetVector<CallSite, 16> Calls;
 
-        if (!F->isDeclaration() && isInlineViable(*F)) {
+        // if (!F->isDeclaration()) {
+        if (!F->isDeclaration() && isInlineViable(*F)) { // Is inline viable 하면 bitcount2 도 줄지만, 5는 늘어나
             Calls.clear();
 
             for (User *U : F->users())
