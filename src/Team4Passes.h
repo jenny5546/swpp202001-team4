@@ -37,6 +37,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/IR/Use.h"
 #include "llvm/IR/Value.h"
@@ -75,7 +76,8 @@ public:
 
 class FunctionInlinePass : public llvm::PassInfoMixin<FunctionInlinePass> {
 public:
-    unsigned instsInFunc(const Function &F);
+    unsigned countInsts(const Function &F);
+    unsigned countRegs(const Function &F);
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
