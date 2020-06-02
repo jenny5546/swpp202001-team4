@@ -92,8 +92,10 @@ int main(int argc, char **argv) {
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
   //FPM.addPass(DoNothingPass());
+  FPM.addPass(SimplifyCFGPass());
   FPM.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
+  FPM.addPass(LICMGVLoadPass());
   FPM.addPass(SimplifyCFGPass());
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
   FPM.addPass(LoopUnrollPass());

@@ -77,6 +77,11 @@ public:
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
 
+class LICMGVLoadPass : public llvm::PassInfoMixin<LICMGVLoadPass> {
+public:
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
+};
+
 /* Converts an IR Module into a new IR Module that has registers demoted to stack */
 class DepromoteRegisters : public InstVisitor<DepromoteRegisters> {
 private:
