@@ -107,16 +107,15 @@ void DepromoteRegisters::emitStoreToSrcRegister(Value *V, Instruction *I) {
   if (auto *I = dyn_cast<Instruction>(V))
     if (I->hasName())
       assert(I->getName().startswith("__r"));
-  Evictions[Builder->CreateStore(V, RegToAllocaMap[I])] = true; // add to list of evictions, to differentiate from normal stores
+  Evictions.push_back(Builder->CreateStore(V, RegToAllocaMap[I])); // add to list of evictions, to differentiate from normal stores
 }
 
 void DepromoteRegisters::saveInst(Value *Res, Instruction *I) {
   /* save instruction mapping */
   InstMap[I] = Res;
-  if (RegToAllocaMap.count(I)) 
-    ValToAllocaMap[Res] = RegToAllocaMap[I];
+  if (isa<Constant>(Res))
+    evictTempInst(I);
   saveTempInst(I, Res);
-  evictTempInst(DummyInst);
 }
 
 void DepromoteRegisters::saveTempInst(Instruction *OldI, Value *Res) {
@@ -195,12 +194,13 @@ Value *DepromoteRegisters::translateSrcOperandToTgt(Value *V, unsigned OperandId
     return GVMap[GV];
 
   } else if (auto *I = dyn_cast<Instruction>(V)) {
-    if (RegToAllocaMap.count(I) || !RegToRegMap.count(I)) {
+    assert(InstMap.count(I));
+    if (isa<Constant>(InstMap[I]) || (!RegToAllocaMap.count(I) && RegToRegMap.count(I)))
+      return InstMap[I];
+    else {
       auto *Res = emitLoadFromSrcRegister(I, OperandId);
       saveInst(Res, I); // after retrieved, must put reg value info to TempRegUsers
       return Res;
-    } else {
-      return InstMap[I];
     }
 
   } else {
@@ -212,59 +212,38 @@ void DepromoteRegisters::resolveRegDependency() {
   /* resolve dependency issues by adding load/store insts where dependency could occur */
   vector <pair<Instruction *, pair<Instruction *, Instruction *>>> LoadToAdd;
   vector<pair<Instruction *, Instruction *>> StoreToAdd;
-  vector<Instruction *> StoreToRemove;
 
-  for (auto *BB : BasicBlockBFS) {
-    for (auto &I: *BBMap[BB]) {
-      if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        /* store to XX_slot register indicate eviction from reg, hence start checking */
-        auto *Op = SI->getValueOperand();
-        auto *OpI = dyn_cast<Instruction>(Op);
+  for (auto *SI : Evictions) {
+    /* iterate through list of register evictions */
+    auto *Op = SI->getValueOperand();
+    auto *OpI = dyn_cast<Instruction>(Op);
+    auto *PtyOp = SI->getPointerOperand();
+    vector<pair<Instruction *, Instruction *>> InstsToResolve;
+    vector<BasicBlock *> Reachables;
+    getBlockBFS(SI->getParent(), Reachables);
 
-        if ((!SI->getPointerOperand()->getName().endswith("_slot") && // must be eviction to stack created during depromotion
-             !SI->getPointerOperand()->getName().endswith("_phi")) || !Evictions.count(SI) || !OpI)
-            continue;
+    assert(OpI && isa<AllocaInst>(PtyOp) && "Evicted item is not a valid instruction");
 
-        StoreToRemove.push_back(&I);
-        if (!isa<PHINode>(Op) && !(isa<LoadInst>(Op) && dyn_cast<LoadInst>(Op)->getPointerOperand() == SI->getPointerOperand()))
-          StoreToAdd.push_back(make_pair(OpI, dyn_cast<AllocaInst>(SI->getPointerOperand())));
-        vector<pair<Instruction *, Instruction *>> InstsToResolve;
-        for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr)
-          InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr).getUser()), OpI));
-        for (auto itr = SI->getPointerOperand()->use_begin(), end = SI->getPointerOperand()->use_end(); itr != end; ++itr)
-          if (auto *LI = dyn_cast<LoadInst>((*itr).getUser()))
-            for (auto itr2 = LI->use_begin(), end2 = LI->use_end(); itr2 != end2; ++itr2)
-              if (isa<Instruction>((*itr2).getUser()) && dyn_cast<Instruction>((*itr2).getUser())->getParent() != LI->getParent())
-                InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr2).getUser()), LI));
-        for (auto entry : InstsToResolve) {
-          Instruction *UsrI = entry.first, *OpI = dyn_cast<Instruction>(entry.second);
-          if (!UsrI || UsrI == SI) 
-            continue;
+    if (!isa<PHINode>(Op) && !(isa<LoadInst>(Op) && dyn_cast<LoadInst>(Op)->getPointerOperand() == PtyOp))
+      StoreToAdd.push_back(make_pair(OpI, dyn_cast<AllocaInst>(PtyOp)));
 
-          vector<BasicBlock *> Reachables;
-          getBlockBFS(SI->getParent(), Reachables);
+    for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr)
+      InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr).getUser()), OpI));
 
-          for (BasicBlock *Reachable : Reachables) {
-            if (Reachable != UsrI->getParent() || Reachable == OpI->getParent())
-                continue;
+    for (auto itr = PtyOp->use_begin(), end = PtyOp->use_end(); itr != end; ++itr)
+      if (auto *LI = dyn_cast<LoadInst>((*itr).getUser()))
+        for (auto itr2 = LI->use_begin(), end2 = LI->use_end(); itr2 != end2; ++itr2)
+          InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr2).getUser()), LI));
 
-            for (auto &UserBBInst : *Reachable) {
-              Instruction *PtyOp = ValToAllocaMap[Op];
-              if (&UserBBInst == OpI) 
-                break;
-              if (&UserBBInst != UsrI || !PtyOp)
-                continue;
+    for (auto entry : InstsToResolve) {
+      Instruction *UsrI = entry.first;
+      Instruction *OpI = dyn_cast<Instruction>(entry.second);
 
-              /* user instruction is reachable after eviction */
+      if (!UsrI || UsrI == SI || UsrI->getParent() == OpI->getParent())
+        continue;
 
-              LoadToAdd.push_back(make_pair(PtyOp, make_pair(OpI, UsrI)));
-              break;
-            }
-            break;
-          }
-
-        }
-      }
+      if (std::find(Reachables.begin(), Reachables.end(), UsrI->getParent()) != Reachables.end())
+        LoadToAdd.push_back(make_pair(dyn_cast<Instruction>(PtyOp), make_pair(OpI, UsrI)));
     }
   }
 
@@ -277,61 +256,144 @@ void DepromoteRegisters::resolveRegDependency() {
       if (entry.second.second->getOperand(i) == entry.second.first)
         entry.second.second->setOperand(i, Res); // this is for passing use_empty()
   }
-  for (auto entry : StoreToRemove) entry->eraseFromParent();
+  for (auto entry : Evictions) // eviction stores are no longer needed
+    entry->eraseFromParent();
 }
+
 void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary memory operations
   OrderedInstructions OI(new DominatorTree(*FuncToEmit)); // introduced from resolving dependencies
   std::set<Instruction *> InstsToRemove;
+
   for (auto *BB : BasicBlockBFS) { // go through every instruction, looking for alloca/load/store
     LoadInst *PrevLI = nullptr;
+
     for (auto &I : *BBMap[BB]) {
       if (I.hasName() && I.use_empty() && (isa<AllocaInst>(&I) || isa<LoadInst>(&I))) {
         InstsToRemove.insert(&I); // remove alloca/load that is not used
+
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        if (I.hasOneUse() && isa<StoreInst>(I.use_begin()->getUser()) && // remove load whose only use is store back
-            dyn_cast<StoreInst>(I.use_begin()->getUser())->getPointerOperand() == LI->getPointerOperand())
+        if (I.hasOneUse() && isa<StoreInst>(I.use_begin()->getUser()) &&
+            dyn_cast<StoreInst>(I.use_begin()->getUser())->getPointerOperand() == LI->getPointerOperand()) {
+          // load and store without usage
           InstsToRemove.insert(dyn_cast<Instruction>(I.use_begin()->getUser())); // remove store first (must erase use first!)
-        if (PrevLI != nullptr && PrevLI->getPointerOperand() == LI->getPointerOperand() &&
-            PrevLI->getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) // remove double loads
-          PrevLI->replaceAllUsesWith(LI);
-        PrevLI = LI; // loads detected in above conditions will be deleted on next resursive call by use_empty() condition
-        continue;
+          // load will be removed by use_empty() condition on next recursive call
+
+        } else {
+          // consecutive double loads
+          if (PrevLI != nullptr && PrevLI->getPointerOperand() == LI->getPointerOperand() &&
+            PrevLI->getName().str().substr(0, 6) == LI->getName().str().substr(0, 6))
+              PrevLI->replaceAllUsesWith(LI);
+          
+          PrevLI = LI;
+          continue;
+        }
+        
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        auto *PtyOp = ValToAllocaMap[SI->getValueOperand()];
-        if (!SI->getPointerOperand()->getName().endswith("_slot") || !isa<Instruction>(SI->getValueOperand())) 
+        auto *PtyOp = SI->getPointerOperand();
+        if (!PtyOp->getName().endswith("_slot")) //|| !isa<Instruction>(SI->getValueOperand())) 
           continue;  // only consider store to stack created by depromotion
+
         vector<BasicBlock *> Reachables;
         getBlockBFS(SI->getParent(), Reachables);
-        InstsToRemove.insert(&I);
+
+        InstsToRemove.insert(&I); // if no reachable load after store, remove the store
+
         for (auto itr = PtyOp->use_begin(), end = PtyOp->use_end(); itr != end; ++itr) {
-          LoadInst *UsrI = dyn_cast<LoadInst>(itr->getUser()); // if there is reachable load after store, then store is needed!
+          LoadInst *UsrI = dyn_cast<LoadInst>(itr->getUser()); 
+
           if (UsrI && find(Reachables.begin(), Reachables.end(), UsrI->getParent()) != Reachables.end() &&
-              ((UsrI->getParent() == SI->getParent() && OI.dfsBefore(SI, UsrI)) || (UsrI->getParent() != SI->getParent())))
-            InstsToRemove.erase(&I);
-        } // if no reachable load after store, remove the store
+              !((UsrI->getParent() == SI->getParent() && !OI.dfsBefore(SI, UsrI))))
+            InstsToRemove.erase(&I); // if there is reachable load after store, then store is needed
+        }
+
       }
       PrevLI = nullptr;
     }
+
   }
-  for (auto *I : InstsToRemove) I->eraseFromParent();
-  if (!InstsToRemove.empty()) removeExtraMemoryInsts();
+
+  for (auto *I : InstsToRemove)
+    I->eraseFromParent();
+  if (!InstsToRemove.empty())
+    removeExtraMemoryInsts();
 }
+
+void DepromoteRegisters::replaceDuplicateLoads() {
+  /* search for duplicate loads, and replace it if possible */
+  std::set<Instruction *> InstsToRemove;
+
+  for (auto *BB : BasicBlockBFS) { // go through every instruction, looking for load instructions
+    for (auto &I : *BBMap[BB]) {
+      if (auto *LI = dyn_cast<LoadInst>(&I)) {
+        auto *PtyOp = LI->getPointerOperand();
+
+        // must be a load from stack, allocated during depromotion
+        if (!(PtyOp->getName().endswith("_slot") || 
+              PtyOp->getName().endswith("_phi")) || 
+             !isa<AllocaInst>(PtyOp))
+          continue;
+        
+        // search for possible replacements
+        Instruction *RI = nullptr;
+        for (auto &I : *LI->getParent()) {
+          if (&I == LI) {
+            if (RI) { // replacement was found, replace original load
+              I.replaceAllUsesWith(RI);
+              InstsToRemove.insert(&I);
+            }
+            break;
+          }
+          
+          if (isa<LoadInst>(&I) && dyn_cast<LoadInst>(&I)->getPointerOperand() == PtyOp &&
+              I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) {
+            if (!RI) // a replacement is found
+              RI = &I;
+          } else if (RI && RI->getName().str().substr(0, 6) == I.getName().str().substr(0, 6) &&
+                   I.getName().str().find("after_trunc__") == string::npos) {
+            RI = nullptr; // previously found replacement is not valid
+          }
+
+        }
+
+      }
+    }
+  }
+
+  for (auto *I : InstsToRemove)
+    I->eraseFromParent();
+}
+
 void DepromoteRegisters::cleanRedundantCasts() {
   for (auto *BB : BasicBlockBFS) { // go through every cast instruction
     for (auto &I: *BBMap[BB]) {
       if (auto *CI = dyn_cast<CastInst>(&I)) {
         auto *Op = CI->getOperand(0);
-        if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 || // cases to ignore
+        if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 ||
             Op->getName().str().find("arg") != string::npos ||
             Op->getName().str().find("before_zext__") != string::npos ||
-            CI->getName().str().find("after_trunc__") != string::npos) continue;
+            CI->getName().str().find("after_trunc__") != string::npos)
+          continue;
+
         for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
-          if (&*itr != CI) continue; // if CI is only used once in the next/next-next inst, then it can use Op name
-          if ((++itr != end && &*itr == CI->use_begin()->getUser()) ||
-              (++itr != end && &*itr == CI->use_begin()->getUser()))
-            CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 6))));
+          if (&*itr != CI) // if CI is only used once in the next/next-next inst, then it can use Op name
+            continue;
+
+          ++itr;
+          if (itr == end)
+            break;
+
+          if (&*itr == CI->use_begin()->getUser())
+            CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 2))));
+
+          if (itr->hasName() && itr->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2))
+            break;
+
+          ++itr;
+          if (itr != end && &*itr == CI->use_begin()->getUser())
+              CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 2))));
           break;
         }
+
       }
     }
   }
@@ -348,7 +410,6 @@ void DepromoteRegisters::visitModule(Module &M) {
   I1Ty = IntegerType::getInt1Ty(*Context);
   I8PtrTy = PointerType::getInt8PtrTy(*Context);
   ModuleToEmit->setDataLayout(M.getDataLayout());
-  DummyInst = nullptr; // left for possible future usage
 
   uint64_t GVOffset = 20480;
   FunctionType *MallocTy = nullptr;
@@ -406,7 +467,6 @@ void DepromoteRegisters::visitModule(Module &M) {
 void DepromoteRegisters::visitFunction(Function &F) {
   assert(FuncMap.count(&F));
   FuncToEmit = FuncMap[&F];
-  ValToAllocaMap.clear();
   Evictions.clear();
 
   // Fill source argument -> target argument map.
@@ -461,6 +521,7 @@ void DepromoteRegisters::visitFunction(Function &F) {
   /* resolve dependency issues, and clean-up unnecessarily created instructions */
   resolveRegDependency();
   removeExtraMemoryInsts(); 
+  replaceDuplicateLoads();
   cleanRedundantCasts();
 }
 

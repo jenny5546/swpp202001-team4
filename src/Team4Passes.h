@@ -90,7 +90,6 @@ private:
   BasicBlock *BBToEmit = nullptr;
   unique_ptr<IRBuilder<TargetFolder>> Builder;
   Function *MallocFn = nullptr;
-  Instruction *DummyInst;
   unsigned TempRegCnt;
 
   /* data for building depromoted module */
@@ -101,11 +100,10 @@ private:
   map<BasicBlock *, BasicBlock *> BBMap;
   vector<BasicBlock *> BasicBlockBFS;        // BFS-Ordered Basic Blocks
   map<Instruction *, Value *> InstMap;       // original instruction to depromoted value
-  map<Value *, AllocaInst *> ValToAllocaMap; // depromoted value to reserved alloca slot
   map<Instruction *, unsigned> RegToRegMap;  // permanent register user to register number
   map<Instruction *, AllocaInst *> RegToAllocaMap;
   vector<pair<Instruction *, pair<Value *, unsigned>>> TempRegUsers; // temporary users
-  map<Instruction *, bool> Evictions;
+  vector<StoreInst *> Evictions;
 
   void raiseError(Instruction &I);
 
@@ -130,6 +128,7 @@ private:
   /* after-depromotion clean-up functions */
   void resolveRegDependency();
   void removeExtraMemoryInsts();
+  void replaceDuplicateLoads();
   void cleanRedundantCasts();
 
 public:
