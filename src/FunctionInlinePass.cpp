@@ -2,7 +2,7 @@
 
 /*******************************************
  *          Function Inline Pass
-  
+
  * If a function is worthy to inline, stuff 
  * it into a vector and inline them. 
 
@@ -101,13 +101,12 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
     }
 
 
-    // Remove any live functions.
     erase_if(InlinedFunctions, [&](Function *F) {
         F->removeDeadConstantUsers();
         return !F->isDefTriviallyDead();
     });
 
-    // Delete the non-comdat ones from the module and also from our vector.
+
     auto NonComdatBegin = partition(InlinedFunctions,[&](Function *F) {
         return F->hasComdat(); 
     });
