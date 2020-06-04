@@ -88,14 +88,15 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 BasicBlock *succ;
                 unsigned countArgs=0;
                 bool canSplit = false;
-                succ = SplitBlock(&BB, pointToInsert); 
+                succ = BB.splitBasicBlock(pointToInsert);
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 /* Is unsafe to split, outlines to func args with more than 10 args */
                 if (countArgs>=15){
                     while(totalInsts-point>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
-                        succ = SplitBlock(&BB, pointToInsert); 
+                        // succ = SplitBlock(&BB, pointToInsert); 
+                        succ = BB.splitBasicBlock(pointToInsert);
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         point++;
                         if (countArgs<15){
@@ -142,7 +143,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     pointToInsert = &I;
                     break;
                 }
-                BasicBlock *succ= SplitBlock(BB, pointToInsert); 
+                BasicBlock *succ = BB->splitBasicBlock(pointToInsert);
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 bool canSplit = false;
                 /* Find split the block to another block, so that 
@@ -151,7 +152,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     while(instsInBlock-splitPoint>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
-                        succ = SplitBlock(BB, pointToInsert); 
+                        succ = BB->splitBasicBlock(pointToInsert);
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         splitPoint++;
                         
