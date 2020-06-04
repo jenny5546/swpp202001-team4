@@ -69,7 +69,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 //  Count regs with name in characters & regs that have names like %0, %1...
                 if (I.hasName() || !I.hasName() && !I.getType()->isVoidTy()) { 
                     regsInBlock ++; 
-                       
                 }
                 if (regsInBlock ==15 && !I.isTerminator()){
                     pointToInsert = &I;
@@ -82,40 +81,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
 
             regsInFunc+=regsInBlock;
 
-            /* [Case 1] Split a single big block into pieces */
-
-            if (splitBlockFlag){
-                BasicBlock *succ;
-                unsigned countArgs=0;
-                bool canSplit = false;
-                succ = BB.splitBasicBlock(pointToInsert);
-                countArgs = countOutlinedArgs(succ, funcArgs);
-                /* Is unsafe to split, outlines to func args with more than 10 args */
-                if (countArgs>=15){
-                    while(totalInsts-point>3){
-                        pointToInsert = pointToInsert->getNextNode();
-                        MergeBlockIntoPredecessor(succ);
-                        // succ = SplitBlock(&BB, pointToInsert); 
-                        succ = BB.splitBasicBlock(pointToInsert);
-                        countArgs = countOutlinedArgs(succ, funcArgs);
-                        point++;
-                        if (countArgs<15){
-                            canSplit= true;
-                            break;
-                        }
-                    }
-                    
-                }
-                /* Is safe to split */
-                else{
-                    canSplit= true;
-                }
-                if (canSplit){
-                    // Function *OutlineF = CodeExtractor(succ).extractCodeRegion(CEAC);
-                }
-                else{
-                }
-            }
+            
             /* [Case 2] Split whole blocks if the function uses a lot of regs */
             if (regsInFunc >= 15 && blockCnt>1 && regsInBlock>10 && !splitBlockFlag){ 
                 BBs.push_back(&BB);
@@ -144,6 +110,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     break;
                 }
                 BasicBlock *succ = BB->splitBasicBlock(pointToInsert);
+                // BasicBlock *succ = SplitBlock(BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 bool canSplit = false;
                 /* Find split the block to another block, so that 
@@ -152,6 +119,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     while(instsInBlock-splitPoint>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
+                        // succ = SplitBlock(BB, pointToInsert); 
                         succ = BB->splitBasicBlock(pointToInsert);
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         splitPoint++;
