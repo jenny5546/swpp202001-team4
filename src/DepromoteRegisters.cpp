@@ -53,8 +53,7 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
              dyn_cast<Instruction>(OpVal)->getParent() != I->getParent()) // operand must be in same block for dependence safety
           continue;
         for (unsigned i = 0; i < TempRegCnt; i++) { // if only used once, search for its register ID
-            if (TempRegUsers[i].first != OpVal)
-              continue;
+            if (TempRegUsers[i].first != OpVal) continue;
             registerId = TempRegUsers[i].second.second; // evict without store, and give register to current inst
             TempRegUsers.erase(TempRegUsers.begin() + i);
             TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
@@ -68,7 +67,7 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
       if (TempRegUsers[i].first != nullptr) 
         continue;
       registerId = TempRegUsers[i].second.second;
-      TempRegUsers.erase(TempRegUsers.begin() + i);
+      TempRegUsers.erase(TempRegUsers.begin() + i); // push the register to the end to indicate recent usage (LRU)
       TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
       return assemblyRegisterName(registerId);
     }
@@ -94,7 +93,7 @@ Value *DepromoteRegisters::emitLoadFromSrcRegister(Instruction *I, unsigned targ
   /* retrieve temporary register if being used */
   for (unsigned i = 0; i < TempRegCnt; i++) {
     if (TempRegUsers[i].first == I) {
-      auto Res = TempRegUsers[i].second.first;
+      auto Res = TempRegUsers[i].second.first; // push the register to the end to indicate recent usage (LRU)
       TempRegUsers.push_back(make_pair(TempRegUsers[i].first, 
           make_pair(TempRegUsers[i].second.first, TempRegUsers[i].second.second)));
       TempRegUsers.erase(TempRegUsers.begin() + i);
@@ -178,7 +177,7 @@ bool DepromoteRegisters::getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &
 Value *DepromoteRegisters::translateSrcOperandToTgt(Value *V, unsigned OperandId) {
   checkSrcType(V->getType());
 
-  while (auto *ZI = dyn_cast<ZExtInst>(V))
+  while (auto *ZI = dyn_cast<ZExtInst>(V)) // keep receiving operand until non-zext value
     V = ZI->getOperand(0);
 
   if (auto *A = dyn_cast<Argument>(V)) {
@@ -201,7 +200,6 @@ Value *DepromoteRegisters::translateSrcOperandToTgt(Value *V, unsigned OperandId
     return GVMap[GV];
 
   } else if (auto *I = dyn_cast<Instruction>(V)) {
-    assert(InstMap.count(I));
     if (isa<Constant>(InstMap[I]) || (!RegToAllocaMap.count(I) && RegToRegMap.count(I)))
       return InstMap[I];
     else {
@@ -227,20 +225,18 @@ void DepromoteRegisters::resolveRegDependency() {
     auto *PtyOp = SI->getPointerOperand();
     vector<pair<Instruction *, Instruction *>> InstsToResolve;
 
-    assert(OpI && isa<AllocaInst>(PtyOp) && "Evicted item is not a valid instruction");
-
     if (!isa<PHINode>(Op) && !(isa<LoadInst>(Op) && dyn_cast<LoadInst>(Op)->getPointerOperand() == PtyOp))
-      StoreToAdd.push_back(make_pair(OpI, dyn_cast<AllocaInst>(PtyOp)));
+      StoreToAdd.push_back(make_pair(OpI, dyn_cast<AllocaInst>(PtyOp))); // add store after original instruction
 
-    for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr)
+    for (auto itr = Op->use_begin(), end = Op->use_end(); itr != end; ++itr) // get all usages
       InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr).getUser()), OpI));
 
-    for (auto itr = PtyOp->use_begin(), end = PtyOp->use_end(); itr != end; ++itr)
+    for (auto itr = PtyOp->use_begin(), end = PtyOp->use_end(); itr != end; ++itr) // get all usages after loading back from stack
       if (auto *LI = dyn_cast<LoadInst>((*itr).getUser()))
         for (auto itr2 = LI->use_begin(), end2 = LI->use_end(); itr2 != end2; ++itr2)
           InstsToResolve.push_back(make_pair(dyn_cast<Instruction>((*itr2).getUser()), LI));
 
-    for (auto entry : InstsToResolve) {
+    for (auto entry : InstsToResolve) { // iterate through usages, and add loads before every usage in separate blocks
       Instruction *UsrI = entry.first;
       Instruction *OpI = dyn_cast<Instruction>(entry.second);
 
@@ -309,13 +305,10 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
               !((UsrI->getParent() == SI->getParent() && !OI.dfsBefore(SI, UsrI))))
             InstsToRemove.erase(&I); // if there is reachable load after store, then store is needed
         }
-
       }
       PrevLI = nullptr;
     }
-
   }
-
   for (auto *I : InstsToRemove)
     I->eraseFromParent();
   if (!InstsToRemove.empty())
@@ -325,7 +318,6 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
 void DepromoteRegisters::replaceDuplicateLoads() {
   /* search for duplicate loads, and replace it if possible */
   std::set<Instruction *> InstsToRemove;
-
   for (auto *BB : BasicBlockBFS) { // go through every instruction, looking for load instructions
     for (auto &I : *BBMap[BB]) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
@@ -347,22 +339,17 @@ void DepromoteRegisters::replaceDuplicateLoads() {
             }
             break;
           }
-          
           if (isa<LoadInst>(&I) && dyn_cast<LoadInst>(&I)->getPointerOperand() == PtyOp &&
               I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) {
-            if (!RI) // a replacement is found
-              RI = &I;
+            if (!RI) RI = &I; // a replacement is found
           } else if (RI && RI->getName().str().substr(0, 6) == I.getName().str().substr(0, 6) &&
                    I.getName().str().find("after_trunc__") == string::npos) {
             RI = nullptr; // previously found replacement is not valid
           }
-
         }
-
       }
     }
   }
-
   for (auto *I : InstsToRemove)
     I->eraseFromParent();
 }
@@ -377,21 +364,17 @@ void DepromoteRegisters::cleanRedundantCasts() {
             Op->getName().str().find("before_zext__") != string::npos ||
             CI->getName().str().find("after_trunc__") != string::npos)
           continue;
-
+        // if CI is only used once in the next/next-next inst, then it can use Op name
         for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
-          if (&*itr != CI) // if CI is only used once in the next/next-next inst, then it can use Op name
+          if (&*itr != CI) 
             continue;
-
           ++itr;
           if (itr == end)
             break;
-
           if (&*itr == CI->use_begin()->getUser())
             CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 2))));
-
           if (itr->hasName() && itr->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2))
             break;
-
           ++itr;
           if (itr != end && &*itr == CI->use_begin()->getUser())
               CI->setName(assemblyRegisterName(stoi(Op->getName().str().substr(3, 2))));
@@ -494,7 +477,7 @@ void DepromoteRegisters::visitFunction(Function &F) {
         unsigned argCnt = 0;
         for (auto I = CI->arg_begin(), E = CI->arg_end(); I != E; ++I) 
             argCnt++;
-        if (CI->hasName())
+        if (CI->hasName()) // the instruction itself must have register ID as well
             argCnt++;
         if (argCnt > TempRegCnt) // store max # of arguments needed for a call
             TempRegCnt = argCnt;
