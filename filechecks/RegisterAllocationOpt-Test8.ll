@@ -22,7 +22,7 @@ entry:
 ; CHECK:   [[REG3:r[0-9]+]] = mul [[ARG:arg[0-9]+]] 1 64
 ; CHECK:   [[REG4:r[0-9]+]] = mul [[REG2]] 4 64
 ; CHECK:   [[REG3]] = add [[REG3]] [[REG4]] 64
-; CHECK:   [[REG4]] = load 4 [[REG3]] 0
+; CHECK:   [[REG5:r[0-9]+]] = load 4 [[REG3]] 0
   %call = call i32 @hash(i32 %x, i32 %n)
   %idxprom = sext i32 %call to i64
   %arrayidx = getelementptr inbounds i32, i32* %table, i64 %idxprom

@@ -156,8 +156,7 @@ for.cond.cleanup4:                                ; preds = %for.cond2
 for.body5:                                        ; preds = %for.cond2
 ; CHECK: .for.body5:
 ; CHECK: [[REG1:r[0-9]+]] = load 8 sp [[#SP1:]]
-; CHECK: [[REG2:r[0-9]+]] = load 8 sp [[#SP2:]]
-; CHECK: [[REG3:r[0-9]+]] = add [[REG1]] [[REG2]] 32
+; CHECK: [[REG3:r[0-9]+]] = add [[REG1]] [[REG2:r[0-9]+]] 32
   %add6 = add nsw i32 %i.0, %j.0
   %idxprom = sext i32 %add6 to i64
   %arrayidx = getelementptr inbounds i32, i32* %str, i64 %idxprom
