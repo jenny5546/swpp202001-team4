@@ -1,5 +1,18 @@
 #include "Team4Passes.h"
+/*
+    This pass hoists the Global Variable(GV) Load Instruction I in the loop L to the preheader.
+    It reduces cost caused by repetition of GV Load in the loop.
+    Before it hoists the load instruction it checks following conditions :
+    1. Loop L has prehead where I can be hoisted.
+    2. GV is not updated (stored) in the loop L
+    3. No other load instruction that loads same GV is already hoisted 
+        (if there is one, replace use of I with it)
+    
+    After hoisting, if GV is stored in the prehead block, use that value without loading it again.
 
+    Lastly, remove all the replaced load instructions.
+
+*/
 PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM){
     
     auto &LI = FAM.getResult<LoopAnalysis>(F);
@@ -23,6 +36,8 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
                         auto *GV= dyn_cast<GlobalVariable>(LoadedFrom);
                         if(!GV) continue;
                         assert(GV && "Only Global Variables can be hoisted!");
+                        
+                        // Check if GV is being updated in the same loop.
                         for(auto *BB2 : L->getBlocks()) {
                             for(auto &I2 : *BB2) {
                                 if(auto *SI = dyn_cast<StoreInst>(&I2)) {
@@ -33,6 +48,7 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
                         if(updatedinLoop) continue;
                         assert(!updatedinLoop && "Global Variable is being updated in the Loop!");
                         
+                        // Check if same GV load inst is already hoisted.
                         for(auto *J : HoistedLoadGVInst) {
                             if(LoadedFrom == J->getOperand(0)) {
                                 CanBeReplaced = true;
@@ -56,7 +72,6 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
         
         // Now if the global variable is stored in the preheader block,
         // Do not load again! Just use that loaded value.
-        // Erase the load GV inst
         if(!HoistedLoadGVInst.empty()) {
             for(auto &I : *Preheader) {
                 auto *SI = dyn_cast<StoreInst>(&I);
@@ -72,6 +87,8 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
                 }
             }
         }
+        
+        // Erase all replaced Load Inst.
         for(auto *J : RemovableLoadGVInst) {
             J->eraseFromParent();
         }
