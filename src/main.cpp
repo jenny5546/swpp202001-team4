@@ -89,13 +89,15 @@ int main(int argc, char **argv) {
   LoopPassManager LPM2;
   LPM2.addPass(LoopDeletionPass());
 
+  FunctionPassManager FPM1;
+  FPM1.addPass(LICMGVLoadPass());
+
   FunctionPassManager FPM;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
   //FPM.addPass(DoNothingPass());
   FPM.addPass(SimplifyCFGPass());
   FPM.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
-  FPM.addPass(LICMGVLoadPass());
   FPM.addPass(SimplifyCFGPass());
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
   FPM.addPass(LoopUnrollPass());
@@ -108,6 +110,7 @@ int main(int argc, char **argv) {
   FPM.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM1)));
   MPM.addPass(FunctionOutlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
