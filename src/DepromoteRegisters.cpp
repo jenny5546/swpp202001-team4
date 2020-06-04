@@ -178,7 +178,7 @@ bool DepromoteRegisters::getBlockBFS(BasicBlock *StartBB, vector<BasicBlock *> &
 Value *DepromoteRegisters::translateSrcOperandToTgt(Value *V, unsigned OperandId) {
   checkSrcType(V->getType());
 
-  if (auto *ZI = dyn_cast<ZExtInst>(V))
+  while (auto *ZI = dyn_cast<ZExtInst>(V))
     V = ZI->getOperand(0);
 
   if (auto *A = dyn_cast<Argument>(V)) {
