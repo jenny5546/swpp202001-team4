@@ -77,7 +77,7 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
                 auto *SI = dyn_cast<StoreInst>(&I);
                 if(!SI) continue;
                 for(auto *J : HoistedLoadGVInst) {
-                    auto *StoredVal = dyn_cast<Instruction>(SI->getOperand(0));
+                    auto *StoredVal = SI->getOperand(0);
                     if(!StoredVal) continue;
                     auto *StoredIn = SI->getOperand(1);
                     if(StoredIn == J->getOperand(0)) {
