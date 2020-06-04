@@ -112,14 +112,14 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
         return F->hasComdat(); 
     });
     for (Function *F : make_range(NonComdatBegin, InlinedFunctions.end())) {
-        M.getFunctionList().erase(F);
+        // M.getFunctionList().erase(F);
     }
     InlinedFunctions.erase(NonComdatBegin, InlinedFunctions.end());
 
     if (!InlinedFunctions.empty()) {
         filterDeadComdatFunctions(M, InlinedFunctions);
         for (Function *F : InlinedFunctions){
-            M.getFunctionList().erase(F);
+            // M.getFunctionList().erase(F);
         }
     }
 
