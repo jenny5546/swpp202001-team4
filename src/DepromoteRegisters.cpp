@@ -53,7 +53,8 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
              dyn_cast<Instruction>(OpVal)->getParent() != I->getParent()) // operand must be in same block for dependence safety
           continue;
         for (unsigned i = 0; i < TempRegCnt; i++) { // if only used once, search for its register ID
-            if (TempRegUsers[i].first != OpVal) continue;
+            if (TempRegUsers[i].first != OpVal)
+              continue;
             registerId = TempRegUsers[i].second.second; // evict without store, and give register to current inst
             TempRegUsers.erase(TempRegUsers.begin() + i);
             TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
@@ -66,9 +67,10 @@ string DepromoteRegisters::retrieveAssemblyRegister(Instruction *I, vector<Value
     for (unsigned i = 0; i < TempRegCnt; i++) {
       if (TempRegUsers[i].first != nullptr) 
         continue;
-      TempRegUsers[i].first = I;
-      TempRegUsers[i].second.first = nullptr;
-      return assemblyRegisterName(TempRegUsers[i].second.second);
+      registerId = TempRegUsers[i].second.second;
+      TempRegUsers.erase(TempRegUsers.begin() + i);
+      TempRegUsers.push_back(make_pair(I, make_pair(nullptr, registerId)));
+      return assemblyRegisterName(registerId);
     }
 
     emitStoreToSrcRegister(TempRegUsers[0].second.first, TempRegUsers[0].first);
@@ -91,8 +93,13 @@ Value *DepromoteRegisters::emitLoadFromSrcRegister(Instruction *I, unsigned targ
 
   /* retrieve temporary register if being used */
   for (unsigned i = 0; i < TempRegCnt; i++) {
-    if (TempRegUsers[i].first == I)
-        return TempRegUsers[i].second.first;
+    if (TempRegUsers[i].first == I) {
+      auto Res = TempRegUsers[i].second.first;
+      TempRegUsers.push_back(make_pair(TempRegUsers[i].first, 
+          make_pair(TempRegUsers[i].second.first, TempRegUsers[i].second.second)));
+      TempRegUsers.erase(TempRegUsers.begin() + i);
+      return Res;
+    }
   }
 
   auto *TgtVal = Builder->CreateLoad(RegToAllocaMap[I], retrieveAssemblyRegister(I));
@@ -219,8 +226,6 @@ void DepromoteRegisters::resolveRegDependency() {
     auto *OpI = dyn_cast<Instruction>(Op);
     auto *PtyOp = SI->getPointerOperand();
     vector<pair<Instruction *, Instruction *>> InstsToResolve;
-    vector<BasicBlock *> Reachables;
-    getBlockBFS(SI->getParent(), Reachables);
 
     assert(OpI && isa<AllocaInst>(PtyOp) && "Evicted item is not a valid instruction");
 
@@ -242,8 +247,7 @@ void DepromoteRegisters::resolveRegDependency() {
       if (!UsrI || UsrI == SI || UsrI->getParent() == OpI->getParent())
         continue;
 
-      if (std::find(Reachables.begin(), Reachables.end(), UsrI->getParent()) != Reachables.end())
-        LoadToAdd.push_back(make_pair(dyn_cast<Instruction>(PtyOp), make_pair(OpI, UsrI)));
+      LoadToAdd.push_back(make_pair(dyn_cast<Instruction>(PtyOp), make_pair(OpI, UsrI)));
     }
   }
 
@@ -290,7 +294,7 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
         
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
         auto *PtyOp = SI->getPointerOperand();
-        if (!PtyOp->getName().endswith("_slot")) //|| !isa<Instruction>(SI->getValueOperand())) 
+        if (!PtyOp->getName().endswith("_slot") || !isa<Instruction>(SI->getValueOperand()))
           continue;  // only consider store to stack created by depromotion
 
         vector<BasicBlock *> Reachables;
@@ -482,13 +486,15 @@ void DepromoteRegisters::visitFunction(Function &F) {
     return;
 
   /* decide total number of temporary registers */
-  TempRegCnt = 3; // minimum required number
+  TempRegCnt = 4; // minimum required number
   unsigned instCnt = 0; // total number of registers
   for (auto &BB: F) {
     for (auto &I: BB) {
       if (auto *CI = dyn_cast<CallInst>(&I)) {
         unsigned argCnt = 0;
         for (auto I = CI->arg_begin(), E = CI->arg_end(); I != E; ++I) 
+            argCnt++;
+        if (CI->hasName())
             argCnt++;
         if (argCnt > TempRegCnt) // store max # of arguments needed for a call
             TempRegCnt = argCnt;
@@ -498,7 +504,7 @@ void DepromoteRegisters::visitFunction(Function &F) {
     }
   }
 
-  if ((instCnt <= 13) && (TempRegCnt <= 16 - instCnt)) 
+  if ((instCnt <= 12) && (TempRegCnt <= 16 - instCnt)) 
     TempRegCnt = 16 - instCnt; // all values are permanent register users
   else if (TempRegCnt < 8) 
     TempRegCnt = 8;
