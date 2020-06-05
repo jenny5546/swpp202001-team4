@@ -106,7 +106,6 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
         return !F->isDefTriviallyDead();
     });
 
-
     auto NonComdatBegin = partition(InlinedFunctions,[&](Function *F) {
         return F->hasComdat(); 
     });
