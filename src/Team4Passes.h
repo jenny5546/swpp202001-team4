@@ -40,6 +40,10 @@
 #include "llvm/IR/Use.h"
 #include "llvm/IR/Value.h"
 
+//ahyoung
+#include "llvm/Transforms/Scalar/TailRecursionElimination.h"
+#include "llvm/Transforms/Scalar/SCCP.h"
+
 #include <algorithm>
 #include <memory>
 #include <string>

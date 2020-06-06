@@ -99,9 +99,11 @@ int main(int argc, char **argv) {
   FPM.addPass(LoopUnrollPass());
 
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TailCallElimPass());
   FPM.addPass(GVN());
-  FPM.addPass(DCEPass());
   FPM.addPass(ArithmeticPass());
+  FPM.addPass(SCCPPass());
+  FPM.addPass(DCEPass());
   FPM.addPass(Malloc2AllocPass());
   FPM.addPass(SimplifyCFGPass());
 
