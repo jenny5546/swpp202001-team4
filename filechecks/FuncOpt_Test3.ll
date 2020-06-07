@@ -71,4 +71,3 @@ for.inc:                                          ; preds = %for.body
 for.end:                                          ; preds = %for.cond.cleanup
   ret i32 0
 }
-; CHECK: end main:
