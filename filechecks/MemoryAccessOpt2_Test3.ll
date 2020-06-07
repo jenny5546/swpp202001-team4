@@ -16,7 +16,7 @@ if.end:                                           ; preds = %entry
 for.cond:                                         ; preds = %for.inc, %if.end
   %i.0 = phi i64 [ 0, %if.end ], [ %inc, %for.inc ]
   %cmp1 = icmp ult i64 %i.0, %n
-  br i1 %cmap1, label %for.body, label %for.cond.cleanup
+  br i1 %cmp1, label %for.body, label %for.cond.cleanup
 
 for.cond.cleanup:                                 ; preds = %for.cond
   br label %for.end
