@@ -96,10 +96,21 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
             for (CallSite CS : Calls){
                 Inlined |= InlineFunction(CS, IFI, /*CalleeAAR=*/nullptr, false);
             }
-            InlinedFunctions.push_back(F);
+            bool isOutlinedFunction = false;
+            
+            for (auto &BB: F->getBasicBlockList()){
+                if (BB.getName() == "newFuncRoot"){
+                    isOutlinedFunction = true;
+                }
+            }
+
+            if (!isOutlinedFunction) {
+                InlinedFunctions.push_back(F);
+            }
+
+            
         }
     }
-
 
     erase_if(InlinedFunctions, [&](Function *F) {
         F->removeDeadConstantUsers();
@@ -109,15 +120,15 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
     auto NonComdatBegin = partition(InlinedFunctions,[&](Function *F) {
         return F->hasComdat(); 
     });
-    for (Function *F : make_range(NonComdatBegin, InlinedFunctions.end())) {
-        // M.getFunctionList().erase(F);
-    }
+    // for (Function *F : make_range(NonComdatBegin, InlinedFunctions.end())) {
+    //     // M.getFunctionList().erase(F);
+    // }
     InlinedFunctions.erase(NonComdatBegin, InlinedFunctions.end());
 
     if (!InlinedFunctions.empty()) {
         filterDeadComdatFunctions(M, InlinedFunctions);
         for (Function *F : InlinedFunctions){
-            // M.getFunctionList().erase(F);
+            M.getFunctionList().erase(F);
         }
     }
 
