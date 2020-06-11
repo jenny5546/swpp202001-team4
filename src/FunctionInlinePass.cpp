@@ -50,7 +50,7 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
 
                     // Check if the calledfunc and the original function uses
                     // less than 15 registers-> optimal for inlining
-                    if (countRegs(*calledfunc)<15 && countRegs(F)<15){ 
+                    if (countRegs(*calledfunc)<15){ 
                         CalledFunctions.push_back(calledfunc);
                         trace.push_back(tuple<Function *,BasicBlock &>(calledfunc, BB));
                     }
