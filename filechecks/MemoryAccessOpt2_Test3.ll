@@ -23,7 +23,6 @@ for.cond.cleanup:                                 ; preds = %for.cond
 
 for.body:                                         ; preds = %for.cond
 ; CHECK: reset heap
-; CHECK: reset stack
   %call2 = call i64 (...) @read()
   %arrayidx = getelementptr inbounds i64, i64* %0, i64 %i.0
   store i64 %call2, i64* %arrayidx, align 8
