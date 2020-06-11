@@ -34,6 +34,9 @@ obj/FunctionOutlinePass.o: src/FunctionOutlinePass.cpp $(DEPS)
 
 obj/FunctionInlinePass.o: src/FunctionInlinePass.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
+  
+obj/LICMGVLoadPass.o: src/LICMGVLoadPass.cpp $(DEPS)
+	@$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 obj/DepromoteRegisters.o: src/DepromoteRegisters.cpp $(DEPS)
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<

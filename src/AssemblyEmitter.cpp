@@ -327,6 +327,12 @@ public:
         }
       }
     }
+    if(auto *CE = dyn_cast<ConstantExpr>(LI.getPointerOperand())){
+      if(CE->getOpcode() == Instruction::IntToPtr) {
+        accessHeap = 1;
+        loc = "heap";
+      }
+    }
     /* to code as conservative as possible, I will not emit reset if it is 100% sure 
     that the memory access location has changed */
     if((prev != accessHeap) && (prev!=2)) emitReset(loc);
@@ -364,6 +370,13 @@ public:
         }
       }
     }
+    if(auto *CE = dyn_cast<ConstantExpr>(SI.getPointerOperand())){
+      if(CE->getOpcode() == Instruction::IntToPtr) {
+        accessHeap = 1;
+        loc = "heap";
+      }
+    }
+
     if((prev != accessHeap) && (prev!=2)) emitReset(loc);
     auto [ValOp, _] = getOperand(SI.getValueOperand(), true);
     auto [PtrOp, StackOffset] = getOperand(SI.getPointerOperand(), false);
