@@ -36,6 +36,8 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/IR/Use.h"
 #include "llvm/IR/Value.h"
@@ -72,7 +74,19 @@ public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 
+class FunctionInlinePass : public llvm::PassInfoMixin<FunctionInlinePass> {
+public:
+    unsigned countInsts(const Function &F);
+    unsigned countRegs(const Function &F);
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+};
+
 class ArithmeticPass : public llvm::PassInfoMixin<ArithmeticPass> {
+public:
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
+};
+
+class LICMGVLoadPass : public llvm::PassInfoMixin<LICMGVLoadPass> {
 public:
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
