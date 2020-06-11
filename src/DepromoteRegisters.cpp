@@ -272,10 +272,10 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
         InstsToRemove.insert(&I); // remove alloca/load that is not used
 
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        if (I.hasOneUse() && isa<StoreInst>(I.use_begin()->getUser()) &&
-            dyn_cast<StoreInst>(I.use_begin()->getUser())->getPointerOperand() == LI->getPointerOperand()) {
+        auto *SIOP = dyn_cast<StoreInst>(I.use_begin()->getUser());
+        if (I.hasOneUse() && SIOP && SIOP->getPointerOperand() == LI->getPointerOperand()) {
           // load and store without usage
-          InstsToRemove.insert(dyn_cast<Instruction>(I.use_begin()->getUser())); // remove store first (must erase use first!)
+          InstsToRemove.insert(dyn_cast<Instruction>(SIOP)); // remove store first (must erase use first!)
           // load will be removed by use_empty() condition on next recursive call
 
         } else {
@@ -339,7 +339,7 @@ void DepromoteRegisters::replaceDuplicateLoads() {
             }
             break;
           }
-          auto newLI = dyn_cast<LoadInst>(&I);
+          auto *newLI = dyn_cast<LoadInst>(&I);
           if (newLI && newLI->getPointerOperand() == PtyOp &&
               I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) {
             if (!RI) RI = &I; // a replacement is found
