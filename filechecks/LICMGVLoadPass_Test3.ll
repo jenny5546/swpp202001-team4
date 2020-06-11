@@ -72,8 +72,8 @@ declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
 ; Function Attrs: nounwind uwtable
 define dso_local i32 @main() #0 {
 entry:
-  store i64 100, i64* @N, align 8
-  store i64 200, i64* @M, align 8
+  store i64 10, i64* @N, align 8
+  store i64 20, i64* @M, align 8
   %call = call i64 @test1()
   ret i32 0
 }

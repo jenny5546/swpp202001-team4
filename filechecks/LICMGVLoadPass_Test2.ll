@@ -109,6 +109,8 @@ define dso_local i32 @main() #0 {
 ; CHECK: .for.cond4:
 ; CHECK-NOT: load 8 20480 0
 ; CHECK-NOT: load 8 20496 0
+; CHECK: br
+
 entry:
   store i64 100, i64* @N, align 8
   %0 = load i64, i64* @N, align 8
