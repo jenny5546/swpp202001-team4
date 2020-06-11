@@ -8,7 +8,7 @@
     3. No other load instruction that loads same GV is already hoisted 
         (if there is one, replace use of I with it)
     
-    After hoisting, if GV is stored in the prehead block, use that value without loading it again.
+    After hoisting, if GV will be loaded in the prehead block, so use that value without loading it again.
 
     Lastly, remove all the replaced load instructions.
 
@@ -24,16 +24,16 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
         vector<Instruction*> HoistedLoadGVInst;
         vector<Instruction*> RemovableLoadGVInst;
 
-        for(auto *BB : L->getBlocks()) {
-            for(auto itr = BB->begin(); itr!=BB->end();) {
+        for(auto *BB1 : L->getBlocks()) {
+            for(auto itr = BB1->begin(); itr!=BB1->end();) {
                 auto &I = *itr++;
                 
                 if(auto *LI = dyn_cast<LoadInst>(&I)){
                     if(L->hasLoopInvariantOperands(LI)) {
                         bool updatedinLoop = false;
-                        bool CanBeReplaced = false;
-                        auto *LoadedFrom = LI->getOperand(0);
-                        auto *GV= dyn_cast<GlobalVariable>(LoadedFrom);
+                        bool canBeReplaced = false;
+                        auto *loadedFrom = LI->getOperand(0);
+                        auto *GV= dyn_cast<GlobalVariable>(loadedFrom);
                         if(!GV) continue;
                         assert(GV && "Only Global Variables can be hoisted!");
                         
@@ -41,7 +41,7 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
                         for(auto *BB2 : L->getBlocks()) {
                             for(auto &I2 : *BB2) {
                                 if(auto *SI = dyn_cast<StoreInst>(&I2)) {
-                                    if(SI->getOperand(1) == LoadedFrom) updatedinLoop = true;
+                                    if(SI->getOperand(1) == loadedFrom) updatedinLoop = true;
                                 }
                             }
                         }
@@ -49,16 +49,16 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
                         assert(!updatedinLoop && "Global Variable is being updated in the Loop!");
                         
                         // Check if same GV load inst is already hoisted.
-                        for(auto *J : HoistedLoadGVInst) {
-                            if(LoadedFrom == J->getOperand(0)) {
-                                CanBeReplaced = true;
-                                LI->replaceAllUsesWith(J);
+                        for(auto *hoistedInst : HoistedLoadGVInst) {
+                            if(loadedFrom == hoistedInst->getOperand(0)) {
+                                canBeReplaced = true;
+                                LI->replaceAllUsesWith(hoistedInst);
                                 RemovableLoadGVInst.push_back(LI);
                                 break;
                             }
                         }
-                        if(CanBeReplaced) continue;
-                        assert(!CanBeReplaced && "Same load instruction is already hoisted. Replace with that!");
+                        if(canBeReplaced) continue;
+                        assert(!canBeReplaced && "Same load instruction is already hoisted. Replace with that!");
                         
                         // Hoist GV load instruction LI to the preheader block
                         HoistedLoadGVInst.push_back(LI);
@@ -76,21 +76,20 @@ PreservedAnalyses LICMGVLoadPass::run(Function &F, FunctionAnalysisManager &FAM)
             for(auto &I : *Preheader) {
                 auto *SI = dyn_cast<StoreInst>(&I);
                 if(!SI) continue;
-                for(auto *J : HoistedLoadGVInst) {
+                for(auto *hoistedInst : HoistedLoadGVInst) {
                     auto *StoredVal = SI->getOperand(0);
-                    if(!StoredVal) continue;
                     auto *StoredIn = SI->getOperand(1);
-                    if(StoredIn == J->getOperand(0)) {
-                        J->replaceAllUsesWith(StoredVal);
-                        RemovableLoadGVInst.push_back(J);
+                    if(StoredIn == hoistedInst->getOperand(0)) {
+                        hoistedInst->replaceAllUsesWith(StoredVal);
+                        RemovableLoadGVInst.push_back(hoistedInst);
                     }
                 }
             }
         }
         
         // Erase all replaced Load Inst.
-        for(auto *J : RemovableLoadGVInst) {
-            J->eraseFromParent();
+        for(auto *removableInst : RemovableLoadGVInst) {
+            removableInst->eraseFromParent();
         }
     }
     return PreservedAnalyses::all();

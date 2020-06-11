@@ -92,27 +92,25 @@ int main(int argc, char **argv) {
   FunctionPassManager FPM1;
   FPM1.addPass(LICMGVLoadPass());
 
-  FunctionPassManager FPM;
+  FunctionPassManager FPM2;
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
-  //FPM.addPass(DoNothingPass());
-  FPM.addPass(SimplifyCFGPass());
-  FPM.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
-  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
-  FPM.addPass(SimplifyCFGPass());
-  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
-  FPM.addPass(LoopUnrollPass());
+  FPM2.addPass(SimplifyCFGPass());
+  FPM2.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
+  FPM2.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
+  FPM2.addPass(SimplifyCFGPass());
+  FPM2.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
+  FPM2.addPass(LoopUnrollPass());
 
-  FPM.addPass(SimplifyCFGPass());
-  FPM.addPass(GVN());
-  FPM.addPass(DCEPass());
-  FPM.addPass(ArithmeticPass());
-  FPM.addPass(Malloc2AllocPass());
-  FPM.addPass(SimplifyCFGPass());
+  FPM2.addPass(SimplifyCFGPass());
+  FPM2.addPass(GVN());
+  FPM2.addPass(ArithmeticPass());
+  FPM2.addPass(Malloc2AllocPass());
+  FPM2.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM1)));
-  MPM.addPass(FunctionOutlinePass());  
-  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+  MPM.addPass(FunctionOutlinePass());
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM2)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
   
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
