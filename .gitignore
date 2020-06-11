@@ -1,11 +1,22 @@
-Makefile
-sf-compiler
-sf-compiler-sprint1
-sf-compiler-tests
+# MacOS
+.DS_Store
+
+# Visual Studio
 .vscode
+
+# Project
+Makefile
+out
+
+# Binaries
 obj
-.tmp.s
+*bin*
+*sf-*
+
+# Test
+test
+test.sh
+*csmith*
+*platform*
 input.ll
-a.out
-a.s
 .tmp.s

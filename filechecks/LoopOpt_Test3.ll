@@ -7,7 +7,7 @@ target triple = "x86_64-unknown-linux-gnu"
 define dso_local void @test1(i64 %n) #0 {
 ; CHECK-LABEL: test1
 ; CHECK-COUNT-10: call write
-; CHECK-NOT: call write
+; CHECK: call write
 entry:
   br label %for.cond
 
