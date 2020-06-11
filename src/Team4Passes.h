@@ -43,6 +43,7 @@
 //ahyoung
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 #include "llvm/Transforms/Scalar/SCCP.h"
+#include "llvm/CodeGen/UnreachableBlockElim.h"
 
 #include <algorithm>
 #include <memory>

@@ -69,6 +69,7 @@ int main(int argc, char **argv) {
   if (!M)
     return 1;
 
+  FunctionPassManager FPM;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
@@ -81,6 +82,8 @@ int main(int argc, char **argv) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
+  
+  FPM.addPass(UnreachableBlockElimPass());
   LoopPassManager LPM1;
   LPM1.addPass(LoopInstSimplifyPass());
   LPM1.addPass(LoopSimplifyCFGPass());
@@ -89,7 +92,7 @@ int main(int argc, char **argv) {
   LoopPassManager LPM2;
   LPM2.addPass(LoopDeletionPass());
 
-  FunctionPassManager FPM;
+  
   // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
   //FPM.addPass(DoNothingPass());
   FPM.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
@@ -99,7 +102,6 @@ int main(int argc, char **argv) {
   FPM.addPass(LoopUnrollPass());
 
   FPM.addPass(SimplifyCFGPass());
-  FPM.addPass(TailCallElimPass());
   FPM.addPass(GVN());
   FPM.addPass(ArithmeticPass());
   FPM.addPass(SCCPPass());
@@ -108,6 +110,10 @@ int main(int argc, char **argv) {
   FPM.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
+  FunctionPassManager FPM2;
+  FPM2.addPass(TailCallElimPass());
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM2)));
+
   MPM.addPass(FunctionOutlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
