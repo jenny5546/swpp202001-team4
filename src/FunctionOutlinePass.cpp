@@ -66,6 +66,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     Keep track of the number of regs.
                 */
                 totalInsts++;
+                
                 //  Count regs with name in characters & regs that have names like %0, %1...
                 if (I.hasName() || !I.hasName() && !I.getType()->isVoidTy()) { 
                     regsInBlock ++; 
@@ -82,7 +83,7 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
             regsInFunc+=regsInBlock;
 
             
-            /* [Case 2] Split whole blocks if the function uses a lot of regs */
+            /* Split whole blocks if the function uses a lot of regs */
             if (regsInFunc >= 15 && blockCnt>1 && regsInBlock>10 && !splitBlockFlag){ 
                 BBs.push_back(&BB);
                 if (const InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator()))
@@ -101,16 +102,17 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                 unsigned splitPoint=1;
                 Instruction *pointToInsert;
                 unsigned countArgs=0;
+
                 for (auto &I : *BB){
                     instsInBlock++;
                 }
+
                 // Get First instruction of the block
                 for (auto &I : *BB){
                     pointToInsert = &I;
                     break;
                 }
                 BasicBlock *succ = BB->splitBasicBlock(pointToInsert);
-                // BasicBlock *succ = SplitBlock(BB, pointToInsert); 
                 countArgs = countOutlinedArgs(succ, funcArgs);
                 bool canSplit = false;
                 /* Find split the block to another block, so that 
@@ -119,7 +121,6 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     while(instsInBlock-splitPoint>3){
                         pointToInsert = pointToInsert->getNextNode();
                         MergeBlockIntoPredecessor(succ);
-                        // succ = SplitBlock(BB, pointToInsert); 
                         succ = BB->splitBasicBlock(pointToInsert);
                         countArgs = countOutlinedArgs(succ, funcArgs);
                         splitPoint++;
