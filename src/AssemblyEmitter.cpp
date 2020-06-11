@@ -159,7 +159,7 @@ public:
   StackFrame CurrentStackFrame;
   // Instruction pointer vector for Memory Instructions (Malloc, Alloca, Global Variables)
   vector<Instruction *> MemAllocation;
-  vector<string> reachables;
+  vector<BasicBlock*> reachables;
   vector<BasicBlock*> blockQueue;
   /* an integer variable to check if the memory access has changed from before
      if an instruction accesses heap (malloc and global variable) accessHeap will be 1, 
@@ -265,7 +265,11 @@ public:
   AssemblyEmitterImpl() {}
 
   void visitFunction(Function &F) {
+    // clear both vectors reachables and blockQueue
+    reachables.clear();
     blockQueue.clear();
+     /* since we only look for the changes of the memory access within the same function, 
+       we initialize accessHeap to unknown when we visit function */ 
     accessHeap = 2;
     // get reachable blocks 
     blockQueue.push_back(&F.getEntryBlock());
@@ -273,10 +277,11 @@ public:
       BasicBlock *block = blockQueue.front();
       blockQueue.erase(blockQueue.begin());
 
+      
       string blockName = block->getName();
-      if (find(reachables.begin(), reachables.end(), blockName) != reachables.end())
+      if (find(reachables.begin(), reachables.end(), block) != reachables.end())
         continue;
-      reachables.push_back(blockName);
+      reachables.push_back(block);
 
       unsigned successorCnt = block->getTerminator()->getNumSuccessors();
       for (unsigned i = 0; i < successorCnt; i++)
@@ -289,10 +294,7 @@ public:
 
   void visitBasicBlock(BasicBlock &BB) { 
     raiseErrorIf(!BB.hasName(), "This basic block does not have name: ", &BB);
-    if(find(reachables.begin(),reachables.end(),BB.getName())==reachables.end()) accessHeap = 2;
-    /* since we only look for the changes of the memory access within the same block, 
-       we initialize accessHeap to false for every basicblock */ 
-    //accessHeap = 2;
+    if(find(reachables.begin(),reachables.end(),&BB)==reachables.end()) accessHeap = 2;
     emitBasicBlockStart(BB.getName().str());
   }
 
@@ -329,7 +331,7 @@ public:
     int prev = accessHeap;
     string loc;
     
-    if(find(reachables.begin(),reachables.end(),LI.getParent()->getName())==reachables.end()) 
+    if(find(reachables.begin(),reachables.end(),LI.getParent())==reachables.end()) 
       accessHeap = 2;
     else{
     for(Instruction* I: MemAllocation){
@@ -370,7 +372,7 @@ public:
     int prev = accessHeap;
     string loc;  
 
-    if(find(reachables.begin(),reachables.end(),SI.getParent()->getName())==reachables.end()) 
+    if(find(reachables.begin(),reachables.end(),SI.getParent())==reachables.end()) 
       accessHeap = 2;
     else{
     for(Instruction* I: MemAllocation){
