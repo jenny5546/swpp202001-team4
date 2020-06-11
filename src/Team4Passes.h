@@ -36,6 +36,8 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/IR/Use.h"
 #include "llvm/IR/Value.h"
@@ -69,6 +71,13 @@ class FunctionOutlinePass : public llvm::PassInfoMixin<FunctionOutlinePass> {
 public:
     bool isOutlinedArgs(const BasicBlock *Block, Value *V);
     unsigned countOutlinedArgs(BasicBlock *Block, vector<Value *> funcArgs);
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+};
+
+class FunctionInlinePass : public llvm::PassInfoMixin<FunctionInlinePass> {
+public:
+    unsigned countInsts(const Function &F);
+    unsigned countRegs(const Function &F);
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 };
 

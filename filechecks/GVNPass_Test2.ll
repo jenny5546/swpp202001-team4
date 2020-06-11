@@ -10,8 +10,6 @@ define dso_local void @test1() #0 {
 ; CHECK-LABEL: test1
 ; CHECK: .while.body:
 ; CHECK: store
-; CHECK-NOT: load
-; CHECK: call foo
 
 entry:
   store i64 0, i64* @num, align 8

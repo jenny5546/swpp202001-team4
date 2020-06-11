@@ -95,7 +95,9 @@ int main(int argc, char **argv) {
   FPM.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
+  
   MPM.addPass(FunctionOutlinePass());  
+  MPM.addPass(FunctionInlinePass());  
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
 
