@@ -3,26 +3,19 @@
 /*******************************************
  *          Function Inline Pass
 
- * If a function is worthy to inline, stuff 
- * it into a vector and inline them. 
+ * If a function is small enough to inline, 
+ * by small enough meaning that the inlined
+ * function should use less than 14 registers,
+ * after filtering these function calls, 
+ * stuff it into a vector and inline them. 
 
 ********************************************/ 
-
-unsigned FunctionInlinePass::countInsts(const Function &F) {
-    unsigned count=0;
-    for (auto &BB : F) {
-        for (auto &I : BB){
-            count++;
-        }
-    }
-    return count;
-}
 
 unsigned FunctionInlinePass::countRegs(const Function &F) {
     unsigned count=0;
     for (auto &BB : F) {
         for (auto &I : BB){
-            if (I.hasName() || !I.hasName() && !I.getType()->isVoidTy()) { 
+            if (I.hasName() || (!I.hasName() && !I.getType()->isVoidTy())) { 
                 count++; 
             }
         }
@@ -39,12 +32,14 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
         return FAM.getResult<AssumptionAnalysis>(F);
     };
 
-    InlineFunctionInfo IFI(/*cg=*/nullptr, &GetAssumptionCache);
+    InlineFunctionInfo IFI(nullptr, &GetAssumptionCache);
     
     SmallVector<Function *, 16> InlinedFunctions;   
     bool Inlined = false;    
 
     SmallVector<Function *, 16> CalledFunctions;  
+
+    // Keep track of the function to inline & where it was called
     vector<tuple <Function *,BasicBlock &> > trace;
 
     for (auto &F : M) {
@@ -53,11 +48,11 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
                 if (auto *CI = dyn_cast<CallInst>(&I)){
                     Function *calledfunc = CI->getCalledFunction();
 
-                    if (countRegs(*calledfunc)<15 && countRegs(F)<15){
-
+                    // Check if the calledfunc and the original function uses
+                    // less than 15 registers-> optimal for inlining
+                    if (countRegs(*calledfunc)<15 && countRegs(F)<15){ 
                         CalledFunctions.push_back(calledfunc);
                         trace.push_back(tuple<Function *,BasicBlock &>(calledfunc, BB));
-
                     }
                 }
             }
@@ -68,19 +63,18 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
 
         Function *F = get<0>(T);
         BasicBlock &block = get<1>(T);
-        // outs()<<"called function is "<<F->getName()<<"\n";
 
         SmallSetVector<CallSite, 16> Calls;
-        // bool duplicate = false;
         unsigned occurences = 0;
         
+        // check if the inlined function is called more than once in the same block
         for(int i = 0;  i < trace.size(); i++){
             if (get<0>(trace[i])==F){
                 occurences++;
             }       
         }
 
-        if (!F->isDeclaration() && isInlineViable(*F)) { // Is inline viable 하면 bitcount2 도 줄지만, 5는 늘어나
+        if (!F->isDeclaration() && isInlineViable(*F)) { 
             Calls.clear();
 
             for (User *U : F->users()) {
@@ -89,28 +83,31 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
                     if (CS.getCalledFunction() == F) {
                         
                         Calls.insert(CS);
-                        // outs()<<"inlined function "<<F->getName()<<"\n";
                     }
                 }
             }
+            // Now inline all the should-be-inlined function 
             for (CallSite CS : Calls){
-                Inlined |= InlineFunction(CS, IFI, /*CalleeAAR=*/nullptr, false);
+                Inlined |= InlineFunction(CS, IFI, nullptr, false);
             }
             bool isOutlinedFunction = false;
+
+            // Don't erase Outlined Functions, even if it is inlined
             
             for (auto &BB: F->getBasicBlockList()){
-                if (BB.getName() == "newFuncRoot"){
+                if (BB.getName() == "newFuncRoot"){ // Checking if it is an outlined func
                     isOutlinedFunction = true;
+                    break;
                 }
             }
-
+            // Don't pushback previously outlined functions
             if (!isOutlinedFunction) {
                 InlinedFunctions.push_back(F);
             }
-
-            
         }
     }
+
+    // Clean up the inlined functions
 
     erase_if(InlinedFunctions, [&](Function *F) {
         F->removeDeadConstantUsers();
@@ -120,9 +117,7 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
     auto NonComdatBegin = partition(InlinedFunctions,[&](Function *F) {
         return F->hasComdat(); 
     });
-    // for (Function *F : make_range(NonComdatBegin, InlinedFunctions.end())) {
-    //     // M.getFunctionList().erase(F);
-    // }
+
     InlinedFunctions.erase(NonComdatBegin, InlinedFunctions.end());
 
     if (!InlinedFunctions.empty()) {
