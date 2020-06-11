@@ -119,7 +119,7 @@ void DepromoteRegisters::emitStoreToSrcRegister(Value *V, Instruction *I) {
 void DepromoteRegisters::saveInst(Value *Res, Instruction *I) {
   /* save instruction mapping */
   InstMap[I] = Res;
-  if (isa<Constant>(Res))
+  if (isa<Constant>(Res)) // if the value turns out to be a constant, it should not reside in register
     evictTempInst(I);
   saveTempInst(I, Res);
 }
