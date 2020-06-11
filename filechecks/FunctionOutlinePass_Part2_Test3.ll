@@ -253,7 +253,7 @@ for.end:                                          ; preds = %for.cond.cleanup
 ; CHECK-NOT:  start main.for.body [[SCOPE:[0-10]+]]:
 ; CHECK-NOT:  end main.for.body
 
-; CHECK: .newFuncRoot:
+
 
 declare void @write(i64) #2
 
