@@ -37,8 +37,6 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
     SmallVector<Function *, 16> InlinedFunctions;   
     bool Inlined = false;    
 
-    SmallVector<Function *, 16> CalledFunctions;  
-
     // Keep track of the function to inline & where it was called
     vector<tuple <Function *,BasicBlock &> > trace;
 
@@ -51,8 +49,30 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
                     // Check if the calledfunc and the original function uses
                     // less than 15 registers-> optimal for inlining
                     if (countRegs(*calledfunc)<15){ 
-                        CalledFunctions.push_back(calledfunc);
-                        trace.push_back(tuple<Function *,BasicBlock &>(calledfunc, BB));
+
+                        bool hasAlloca=false;
+
+                        for (auto &b: *calledfunc) {
+                            for (auto &inst: b){
+                                if (isa<AllocaInst>(&inst)){
+                                    hasAlloca=true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (&F.getEntryBlock() == &BB) {
+                            for (auto &i: BB){
+                                if (isa<AllocaInst>(&i)){
+                                    hasAlloca=true;
+                                    break;
+                                }
+                            }
+                        }
+                        // Push if it does not have alloca
+                        if (!hasAlloca){
+                            trace.push_back(tuple<Function *,BasicBlock &>(calledfunc, BB));
+                        }
                     }
                 }
             }
@@ -88,22 +108,11 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
             }
             // Now inline all the should-be-inlined function 
             for (CallSite CS : Calls){
-                Inlined |= InlineFunction(CS, IFI, nullptr, false);
+                if (CS->getParent() == &block)
+                    Inlined |= InlineFunction(CS, IFI, nullptr, false);
             }
             bool isOutlinedFunction = false;
 
-            // Don't erase Outlined Functions, even if it is inlined
-            
-            for (auto &BB: F->getBasicBlockList()){
-                if (BB.getName() == "newFuncRoot"){ // Checking if it is an outlined func
-                    isOutlinedFunction = true;
-                    break;
-                }
-            }
-            // Don't pushback previously outlined functions
-            if (!isOutlinedFunction) {
-                InlinedFunctions.push_back(F);
-            }
         }
     }
 
@@ -126,6 +135,5 @@ PreservedAnalyses FunctionInlinePass::run(Module &M, ModuleAnalysisManager &MAM)
             M.getFunctionList().erase(F);
         }
     }
-
     return Inlined ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

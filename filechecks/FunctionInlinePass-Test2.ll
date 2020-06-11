@@ -115,8 +115,8 @@ for.inc:                                          ; preds = %for.body
 
 for.end:                                          ; preds = %for.cond.cleanup
 ;   CHECK-NOT:  [[REG:]] = call isPositive [[REG:]]
-;   CHECK-NOT:  [[REG:]] = call isNegative [[REG:]]
-;   CHECK-NOT:  [[REG:]] = call isZero [[REG:]]
+;   CHECK:  [[REG:]] = call isNegative [[REG:]]
+;   CHECK:  [[REG:]] = call isZero [[REG:]]
   %call = call i64 (...) @read()
   %conv = trunc i64 %call to i32
   %call7 = call i32 @isPositive(i32 %conv)
