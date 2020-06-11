@@ -15,10 +15,8 @@ entry:
 define void @hash_insert(i32* %table, i32 %n, i32 %x) #0 {
 entry:
 ; CHECK: .entry:
-; CHECK:   [[REG1:r[0-9]+]] = call hash [[ARG:arg[0-9]+]] [[ARG:arg[0-9]+]]
-; CHECK:   [[REG2:r[0-9]+]] = udiv [[REG1]] 2147483648 64
-; CHECK:   [[REG2]] = mul [[REG2]] 18446744071562067968 64
-; CHECK:   [[REG2]] = or [[REG2]] [[REG1]] 64
+; CHECK:   [[REG2:r[0-9]+]] = mul [[REG2]] 18446744071562067968 64
+; CHECK:   [[REG2]] = or [[REG2]] [[REG1:r[0-9]+]] 64
 ; CHECK:   [[REG3:r[0-9]+]] = mul [[ARG:arg[0-9]+]] 1 64
 ; CHECK:   [[REG4:r[0-9]+]] = mul [[REG2]] 4 64
 ; CHECK:   [[REG3]] = add [[REG3]] [[REG4]] 64
@@ -156,18 +154,16 @@ entry:
 ; CHECK:  .entry:
 ; CHECK:    [[REG:r[0-9]+]] = add sp 0 64
 ; CHECK:    store 4 4294967295 [[REGC:r[0-9]+]] 0
-; CHECK:    [[REG:r[0-9]+]] = add [[REGC]] 4 64
-; CHECK:    store 4 4294967295 [[REG]] 0
-; CHECK:    [[REG:r[0-9]+]] = add [[REGC]] 8 64
-; CHECK:    store 4 4294967295 [[REG]] 0
-; CHECK:    [[REG:r[0-9]+]] = add [[REGC]] 12 64
-; CHECK:    store 4 4294967295 [[REG]] 0
-; CHECK:    [[REG:r[0-9]+]] = add [[REGC]] 16 64
-; CHECK:    store 4 4294967295 [[REG]] 0
-; CHECK:    [[REG:r[0-9]+]] = add [[REGC]] 20 64
-; CHECK:    store 4 4294967295 [[REG]] 0
-; CHECK:    [[REG:r[0-9]+]] = add [[REGC]] 24 64
-; CHECK:    store 4 4294967295 [[REG]] 0
+; CHECK:    [[REG1:r[0-9]+]] = add [[REG]] 4 64
+; CHECK:    store 4 4294967295 [[REGC:r[0-9]+]] 0
+; CHECK:    [[REG2:r[0-9]+]] = add [[REG]] 8 64
+; CHECK:    store 4 4294967295 [[REGC:r[0-9]+]] 0
+; CHECK:    [[REG3:r[0-9]+]] = add [[REG]] 12 64
+; CHECK:    store 4 4294967295 [[REGC:r[0-9]+]] 0
+; CHECK:    [[REG4:r[0-9]+]] = add [[REG]] 16 64
+; CHECK:    store 4 4294967295 [[REGC:r[0-9]+]] 0
+; CHECK:    [[REG5:r[0-9]+]] = add [[REG]] 20 64
+; CHECK:    store 4 4294967295 [[REGC:r[0-9]+]] 0
   %hash_table = alloca [7 x i32], align 16
   br label %for.cond
 

@@ -3,16 +3,6 @@ define i32 @main() #0 {
 entry:
   %call = call i64 (...) @read()
 ; CHECK: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
-; CHECK-NEXT: [[REG:]] store 8 0 sp [[#SP:]]
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry
