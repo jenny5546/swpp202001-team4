@@ -277,8 +277,6 @@ public:
       BasicBlock *block = blockQueue.front();
       blockQueue.erase(blockQueue.begin());
 
-      
-      string blockName = block->getName();
       if (find(reachables.begin(), reachables.end(), block) != reachables.end())
         continue;
       reachables.push_back(block);
