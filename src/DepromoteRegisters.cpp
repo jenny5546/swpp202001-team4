@@ -339,7 +339,8 @@ void DepromoteRegisters::replaceDuplicateLoads() {
             }
             break;
           }
-          if (isa<LoadInst>(&I) && dyn_cast<LoadInst>(&I)->getPointerOperand() == PtyOp &&
+          auto newLI = dyn_cast<LoadInst>(&I);
+          if (newLI && newLI->getPointerOperand() == PtyOp &&
               I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)) {
             if (!RI) RI = &I; // a replacement is found
           } else if (RI && RI->getName().str().substr(0, 6) == I.getName().str().substr(0, 6) &&
