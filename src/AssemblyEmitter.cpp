@@ -159,6 +159,8 @@ public:
   StackFrame CurrentStackFrame;
   // Instruction pointer vector for Memory Instructions (Malloc, Alloca, Global Variables)
   vector<Instruction *> MemAllocation;
+  vector<BasicBlock*> reachables;
+  vector<BasicBlock*> blockQueue;
   /* an integer variable to check if the memory access has changed from before
      if an instruction accesses heap (malloc and global variable) accessHeap will be 1, 
      if an instruction accesses stack (alloca) accessHeap will be 0
@@ -263,15 +265,34 @@ public:
   AssemblyEmitterImpl() {}
 
   void visitFunction(Function &F) {
+    // clear both vectors reachables and blockQueue
+    reachables.clear();
+    blockQueue.clear();
+     /* since we only look for the changes of the memory access within the same function, 
+       we initialize accessHeap to unknown when we visit function */ 
+    accessHeap = 2;
+    // get reachable blocks 
+    blockQueue.push_back(&F.getEntryBlock());
+    while (!blockQueue.empty()) {
+      BasicBlock *block = blockQueue.front();
+      blockQueue.erase(blockQueue.begin());
+
+      if (find(reachables.begin(), reachables.end(), block) != reachables.end())
+        continue;
+      reachables.push_back(block);
+
+      unsigned successorCnt = block->getTerminator()->getNumSuccessors();
+      for (unsigned i = 0; i < successorCnt; i++)
+        blockQueue.push_back(block->getTerminator()->getSuccessor(i));
+    }
+
     CurrentStackFrame = StackFrame();
     FnBody.clear();
   }
 
   void visitBasicBlock(BasicBlock &BB) { 
     raiseErrorIf(!BB.hasName(), "This basic block does not have name: ", &BB);
-    /* since we only look for the changes of the memory access within the same block, 
-       we initialize accessHeap to false for every basicblock */ 
-    accessHeap = 2;
+    if(find(reachables.begin(),reachables.end(),&BB)==reachables.end()) accessHeap = 2;
     emitBasicBlockStart(BB.getName().str());
   }
 
@@ -308,10 +329,12 @@ public:
     int prev = accessHeap;
     string loc;
     
+    if(find(reachables.begin(),reachables.end(),LI.getParent())==reachables.end()) 
+      accessHeap = 2;
+    else{
     for(Instruction* I: MemAllocation){
       CallInst *CI = dyn_cast<CallInst>(I);
-      AllocaInst *AI = dyn_cast<AllocaInst>(I);
-      
+      AllocaInst *AI = dyn_cast<AllocaInst>(I);      
       if(CI && (CI == GetUnderlyingObject(LI.getPointerOperand(),CI->getParent()->getParent()->getParent()->getDataLayout()))){
               accessHeap = 1;
               loc = "heap";      
@@ -336,6 +359,7 @@ public:
     /* to code as conservative as possible, I will not emit reset if it is 100% sure 
     that the memory access location has changed */
     if((prev != accessHeap) && (prev!=2)) emitReset(loc);
+    }
     auto [PtrOp, StackOffset] = getOperand(LI.getPointerOperand(), false);
     string Dest = getRegisterNameFromInstruction(&LI, true);
     string sz = getAccessSizeInStr(LI.getType());
@@ -351,6 +375,10 @@ public:
     /* memory access change detection has the same logic as visitLoadInst */
     int prev = accessHeap;
     string loc;  
+
+    if(find(reachables.begin(),reachables.end(),SI.getParent())==reachables.end()) 
+      accessHeap = 2;
+    else{
     for(Instruction* I: MemAllocation){
       CallInst *CI = dyn_cast<CallInst>(I);
       AllocaInst *AI = dyn_cast<AllocaInst>(I);      
@@ -378,6 +406,7 @@ public:
     }
 
     if((prev != accessHeap) && (prev!=2)) emitReset(loc);
+    }
     auto [ValOp, _] = getOperand(SI.getValueOperand(), true);
     auto [PtrOp, StackOffset] = getOperand(SI.getPointerOperand(), false);
     string sz = getAccessSizeInStr(SI.getValueOperand()->getType());
