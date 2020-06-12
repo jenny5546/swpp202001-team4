@@ -6,8 +6,6 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define dso_local void @test1() #0 {
 ; CHECK-LABEL: test1
-; CHECK-NOT: malloc
-; CHECK-NOT: free
 
 entry:
   %call = call noalias i8* @malloc(i64 32) #4

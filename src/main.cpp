@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
   if (!M)
     return 1;
 
+  FunctionPassManager FPM;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
@@ -81,7 +82,9 @@ int main(int argc, char **argv) {
   LPM2.addPass(LoopDeletionPass());
 
   FunctionPassManager FPM1;
+  FPM1.addPass(UnreachableBlockElimPass());
   FPM1.addPass(LICMGVLoadPass());
+  FPM1.addPass(TailCallElimPass());
 
   FunctionPassManager FPM2;
   FPM2.addPass(SimplifyCFGPass());
@@ -90,10 +93,10 @@ int main(int argc, char **argv) {
   FPM2.addPass(SimplifyCFGPass());
   FPM2.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
   FPM2.addPass(LoopUnrollPass());
-
   FPM2.addPass(SimplifyCFGPass());
   FPM2.addPass(GVN());
   FPM2.addPass(ArithmeticPass());
+  FPM2.addPass(SCCPPass());
   FPM2.addPass(DCEPass());
   FPM2.addPass(Malloc2AllocPass());
   FPM2.addPass(SimplifyCFGPass());
