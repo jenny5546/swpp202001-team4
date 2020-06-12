@@ -45,17 +45,6 @@ static unique_ptr<Module> openInputFile(LLVMContext &Context,
   return M;
 }
 
-
-class DoNothingPass : public llvm::PassInfoMixin<DoNothingPass> {
-  std::string outputFile;
-
-public:
-  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM) {
-    return PreservedAnalyses::all();
-  }
-};
-
-
 int main(int argc, char **argv) {
   sys::PrintStackTraceOnErrorSignal(argv[0]);
   PrettyStackTraceProgram X(argc, argv);
@@ -75,6 +64,7 @@ int main(int argc, char **argv) {
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
   PassBuilder PB;
+
   // Register all the basic analyses with the managers.
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
@@ -82,8 +72,7 @@ int main(int argc, char **argv) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  
-  FPM.addPass(UnreachableBlockElimPass());
+  // Register all the passes
   LoopPassManager LPM1;
   LPM1.addPass(LoopInstSimplifyPass());
   LPM1.addPass(LoopSimplifyCFGPass());
@@ -92,32 +81,31 @@ int main(int argc, char **argv) {
   LoopPassManager LPM2;
   LPM2.addPass(LoopDeletionPass());
 
-  
-  // If you want to add a function-level pass, add FPM.addPass(MyPass()) here.
-  //FPM.addPass(DoNothingPass());
-  FPM.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
-  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
-  FPM.addPass(SimplifyCFGPass());
-  FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
-  FPM.addPass(LoopUnrollPass());
+  FunctionPassManager FPM1;
+  FPM1.addPass(UnreachableBlockElimPass());
+  FPM1.addPass(LICMGVLoadPass());
+  FPM1.addPass(TailCallElimPass());
 
-  FPM.addPass(SimplifyCFGPass());
-  FPM.addPass(GVN());
-  FPM.addPass(ArithmeticPass());
-  FPM.addPass(SCCPPass());
-  FPM.addPass(DCEPass());
-  FPM.addPass(Malloc2AllocPass());
-  FPM.addPass(SimplifyCFGPass());
+  FunctionPassManager FPM2;
+  FPM2.addPass(SimplifyCFGPass());
+  FPM2.addPass(RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
+  FPM2.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1)));
+  FPM2.addPass(SimplifyCFGPass());
+  FPM2.addPass(createFunctionToLoopPassAdaptor(std::move(LPM2)));
+  FPM2.addPass(LoopUnrollPass());
+  FPM2.addPass(SimplifyCFGPass());
+  FPM2.addPass(GVN());
+  FPM2.addPass(ArithmeticPass());
+  FPM2.addPass(SCCPPass());
+  FPM2.addPass(DCEPass());
+  FPM2.addPass(Malloc2AllocPass());
+  FPM2.addPass(SimplifyCFGPass());
 
   ModulePassManager MPM;
-  FunctionPassManager FPM2;
-  FPM2.addPass(TailCallElimPass());
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM1)));
+  MPM.addPass(FunctionOutlinePass());
+  MPM.addPass(FunctionInlinePass());
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM2)));
-
-  MPM.addPass(FunctionOutlinePass());  
-  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-  // If you want to add your module-level pass, add MPM.addPass(MyPass2()) here.
-  
   MPM.addPass(SimpleBackend(optOutput, optPrintDepromotedModule));
 
   // Run!

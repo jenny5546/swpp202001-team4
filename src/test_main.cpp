@@ -136,7 +136,7 @@ TEST(MemoryEfficiencyTest, ExtraAlloca3) {
   }
 }
 
-TEST(MemoryEfficiencyTest, ExtraLoad1) {
+TEST(MemoryEfficiencyTest, DoubleLoad1) {
   LLVMContext Context;
   SMDiagnostic Error;
   unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test1.ll", Error, Context);
@@ -171,7 +171,7 @@ TEST(MemoryEfficiencyTest, ExtraLoad1) {
   }
 }
 
-TEST(MemoryEfficiencyTest, ExtraLoad2) {
+TEST(MemoryEfficiencyTest, DoubleLoad2) {
   LLVMContext Context;
   SMDiagnostic Error;
   unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test2.ll", Error, Context);
@@ -206,7 +206,7 @@ TEST(MemoryEfficiencyTest, ExtraLoad2) {
   }
 }
 
-TEST(MemoryEfficiencyTest, ExtraLoad3) {
+TEST(MemoryEfficiencyTest, DoubleLoad3) {
   LLVMContext Context;
   SMDiagnostic Error;
   unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test3.ll", Error, Context);
@@ -313,6 +313,264 @@ TEST(MemoryEfficiencyTest, ExtraStore3) {
         if (auto *LI = dyn_cast<LoadInst>(&I)) {
           ASSERT_TRUE(!(I.hasOneUse() && isa<StoreInst>(I.use_begin()->getUser()) &&
               dyn_cast<StoreInst>(I.use_begin()->getUser())->getPointerOperand() == LI->getPointerOperand()));
+        }
+      }
+    }
+  }
+}
+
+TEST(InstructionRedundancyTest, DuplicateLoad1) {
+  LLVMContext Context;
+  SMDiagnostic Error;
+  unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test7.ll", Error, Context);
+  ASSERT_TRUE(M);
+  
+  InstNamer Namer;
+  Namer.visit(*M);
+  ConstExprToInsts CEI;
+  CEI.visit(*M);
+  DepromoteRegisters Deprom;
+  Deprom.visitModule(*M);
+  Module *DM = Deprom.getDepromotedModule();
+
+  for (auto &F : *DM) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *LI = dyn_cast<LoadInst>(&I)) {
+          auto *PtyOp = LI->getPointerOperand();
+
+          if (!(PtyOp->getName().endswith("_slot") || 
+                PtyOp->getName().endswith("_phi")) || 
+               !isa<AllocaInst>(PtyOp))
+            continue;
+          
+          for (auto &I : *LI->getParent()) {
+            if (&I == LI)
+              continue;
+            
+            ASSERT_TRUE(!(isa<LoadInst>(&I) && dyn_cast<LoadInst>(&I)->getPointerOperand() == PtyOp &&
+                          I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)));
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(InstructionRedundancyTest, DuplicateLoad2) {
+  LLVMContext Context;
+  SMDiagnostic Error;
+  unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test8.ll", Error, Context);
+  ASSERT_TRUE(M);
+  
+  InstNamer Namer;
+  Namer.visit(*M);
+  ConstExprToInsts CEI;
+  CEI.visit(*M);
+  DepromoteRegisters Deprom;
+  Deprom.visitModule(*M);
+  Module *DM = Deprom.getDepromotedModule();
+
+  for (auto &F : *DM) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *LI = dyn_cast<LoadInst>(&I)) {
+          auto *PtyOp = LI->getPointerOperand();
+
+          if (!(PtyOp->getName().endswith("_slot") || 
+                PtyOp->getName().endswith("_phi")) || 
+               !isa<AllocaInst>(PtyOp))
+            continue;
+          
+          for (auto &I : *LI->getParent()) {
+            if (&I == LI)
+              continue;
+            
+            ASSERT_TRUE(!(isa<LoadInst>(&I) && dyn_cast<LoadInst>(&I)->getPointerOperand() == PtyOp &&
+                          I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)));
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(InstructionRedundancyTest, DuplicateLoad3) {
+  LLVMContext Context;
+  SMDiagnostic Error;
+  unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test9.ll", Error, Context);
+  ASSERT_TRUE(M);
+
+  InstNamer Namer;
+  Namer.visit(*M);
+  ConstExprToInsts CEI;
+  CEI.visit(*M);
+  DepromoteRegisters Deprom;
+  Deprom.visitModule(*M);
+  Module *DM = Deprom.getDepromotedModule();
+
+  for (auto &F : *DM) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *LI = dyn_cast<LoadInst>(&I)) {
+          auto *PtyOp = LI->getPointerOperand();
+
+          if (!(PtyOp->getName().endswith("_slot") || 
+                PtyOp->getName().endswith("_phi")) || 
+               !isa<AllocaInst>(PtyOp))
+            continue;
+          
+          for (auto &I : *LI->getParent()) {
+            if (&I == LI)
+              continue;
+            
+            ASSERT_TRUE(!(isa<LoadInst>(&I) && dyn_cast<LoadInst>(&I)->getPointerOperand() == PtyOp &&
+                          I.getName().str().substr(0, 6) == LI->getName().str().substr(0, 6)));
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(InstructionRedundancyTest, UnnecessaryCast1) {
+  LLVMContext Context;
+  SMDiagnostic Error;
+  unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test7.ll", Error, Context);
+  ASSERT_TRUE(M);
+  
+  InstNamer Namer;
+  Namer.visit(*M);
+  ConstExprToInsts CEI;
+  CEI.visit(*M);
+  DepromoteRegisters Deprom;
+  Deprom.visitModule(*M);
+  Module *DM = Deprom.getDepromotedModule();
+
+  for (auto &F : *DM) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *CI = dyn_cast<CastInst>(&I)) {
+          auto *Op = CI->getOperand(0);
+          if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 ||
+              Op->getName().str().find("arg") != string::npos ||
+              Op->getName().str().find("before_zext__") != string::npos ||
+              CI->getName().str().find("after_trunc__") != string::npos)
+            continue;
+
+          for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
+            if (&*itr != CI)
+              continue;
+            ++itr;
+            if (itr == end)
+              break;
+            if (&*itr == CI->use_begin()->getUser())
+              ASSERT_TRUE(CI->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2));
+            if (itr->hasName() && itr->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2))
+              break;
+            ++itr;
+            if (itr == end)
+              break;
+            if (itr != end && &*itr == CI->use_begin()->getUser())
+              ASSERT_TRUE(CI->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2));
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(InstructionRedundancyTest, UnnecessaryCast2) {
+  LLVMContext Context;
+  SMDiagnostic Error;
+  unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test8.ll", Error, Context);
+  ASSERT_TRUE(M);
+  
+  InstNamer Namer;
+  Namer.visit(*M);
+  ConstExprToInsts CEI;
+  CEI.visit(*M);
+  DepromoteRegisters Deprom;
+  Deprom.visitModule(*M);
+  Module *DM = Deprom.getDepromotedModule();
+
+  for (auto &F : *DM) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *CI = dyn_cast<CastInst>(&I)) {
+          auto *Op = CI->getOperand(0);
+          if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 ||
+              Op->getName().str().find("arg") != string::npos ||
+              Op->getName().str().find("before_zext__") != string::npos ||
+              CI->getName().str().find("after_trunc__") != string::npos)
+            continue;
+
+          for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
+            if (&*itr != CI)
+              continue;
+            ++itr;
+            if (itr == end)
+              break;
+            if (&*itr == CI->use_begin()->getUser())
+              ASSERT_TRUE(CI->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2));
+            if (itr->hasName() && itr->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2))
+              break;
+            ++itr;
+            if (itr == end)
+              break;
+            if (itr != end && &*itr == CI->use_begin()->getUser())
+              ASSERT_TRUE(CI->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2));
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(InstructionRedundancyTest, UnnecessaryCast3) {
+  LLVMContext Context;
+  SMDiagnostic Error;
+  unique_ptr<Module> M = parseAssemblyFile("./filechecks/RegisterAllocationOpt-Test9.ll", Error, Context);
+  ASSERT_TRUE(M);
+  
+  InstNamer Namer;
+  Namer.visit(*M);
+  ConstExprToInsts CEI;
+  CEI.visit(*M);
+  DepromoteRegisters Deprom;
+  Deprom.visitModule(*M);
+  Module *DM = Deprom.getDepromotedModule();
+
+  for (auto &F : *DM) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *CI = dyn_cast<CastInst>(&I)) {
+          auto *Op = CI->getOperand(0);
+          if (!dyn_cast<Instruction>(Op) || CI->getNumUses() != 1 ||
+              Op->getName().str().find("arg") != string::npos ||
+              Op->getName().str().find("before_zext__") != string::npos ||
+              CI->getName().str().find("after_trunc__") != string::npos)
+            continue;
+
+          for (auto itr = CI->getParent()->begin(), end = CI->getParent()->end();; ++itr) {
+            if (&*itr != CI)
+              continue;
+            ++itr;
+            if (itr == end)
+              break;
+            if (&*itr == CI->use_begin()->getUser())
+              ASSERT_TRUE(CI->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2));
+            if (itr->hasName() && itr->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2))
+              break;
+            ++itr;
+            if (itr == end)
+              break;
+            if (itr != end && &*itr == CI->use_begin()->getUser())
+              ASSERT_TRUE(CI->getName().str().substr(3, 2) == Op->getName().str().substr(3, 2));
+            break;
+          }
         }
       }
     }

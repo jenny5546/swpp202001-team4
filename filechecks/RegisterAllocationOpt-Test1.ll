@@ -34,8 +34,7 @@ for.end:                                          ; preds = %for.cond.cleanup
 define i32 @main() #0 {
 ; CHECK: start main 0:
 ; CHECK:     [[REG:r[0-9]+]] = call read
-; CHECK-NEXT:     call print_bit [[REG]]
-; CHECK-NEXT:     ret 0
+; CHECK:     ret 0
 entry:
   %call = call i64 (...) @read()
   call void @print_bit(i64 %call)

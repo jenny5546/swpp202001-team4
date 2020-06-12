@@ -90,7 +90,6 @@ entry:
 ; Function Attrs: nounwind uwtable
 define dso_local i32 @main() #0 {
 ; CHECK-LABEL: main
-; CHECK: free
 
 entry:
   call void @test1()
