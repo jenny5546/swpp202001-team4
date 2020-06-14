@@ -290,8 +290,10 @@ void DepromoteRegisters::removeExtraMemoryInsts() {       // remove unnecessary 
         
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
         auto *PtyOp = SI->getPointerOperand();
-        if (!PtyOp->getName().endswith("_slot") || !isa<Instruction>(SI->getValueOperand()))
+        if (!PtyOp->getName().endswith("_slot") || !isa<Instruction>(SI->getValueOperand())) {
+          PrevLI = nullptr; // reset PrevLI since this continues to next iteration
           continue;  // only consider store to stack created by depromotion
+        }
 
         vector<BasicBlock *> Reachables;
         getBlockBFS(SI->getParent(), Reachables);
@@ -606,7 +608,10 @@ void DepromoteRegisters::visitBasicBlock(BasicBlock &BB) {
 
 // Unsupported instruction goes here.
 void DepromoteRegisters::visitInstruction(Instruction &I) {
-  raiseError(I);
+  if (isa<UnreachableInst>(&I) && I.getParent()->getTerminator() == &I) // unreachable instructions are changed to br
+    Builder->CreateBr(BBMap[&I.getParent()->getParent()->getEntryBlock()]);
+  else
+    raiseError(I);
 }
 
 // ---- Memory operations ----
@@ -644,6 +649,8 @@ void DepromoteRegisters::visitLoadInst(LoadInst &LI) {
 }
 
 void DepromoteRegisters::visitStoreInst(StoreInst &SI) {
+  if (isa<UndefValue>(SI.getValueOperand()) || isa<UndefValue>(SI.getPointerOperand()))
+    return; // ignore undef created by GVN
   auto *Ty = SI.getValueOperand()->getType();
   checkSrcType(Ty);
   
@@ -797,8 +804,19 @@ void DepromoteRegisters::visitSExtInst(SExtInst &SI) {
   auto RegName = retrieveAssemblyRegister(&SI); // do not try to use Ops name, since its name is needed below
   auto *AndVal =
     Builder->CreateBinOp(Instruction::UDiv, Op, ConstantInt::get(I64Ty, 1llu << (bw - 1)), RegName);
+  unsigned long long mask = 0llu;
+  if (isa<IntegerType>(SI.getDestTy())) {
+    for (unsigned i = 0, end = SI.getDestTy()->getIntegerBitWidth() - bw; i < end; i++) {
+      mask += 1llu;
+      mask <<= 1;
+    }
+    mask += 1llu;
+    for (unsigned i = 0, end = bw - 1; i < end; i++)
+      mask <<= 1;
+  } else
+    mask -= (1llu << (bw - 1));
   auto *NegVal =
-    Builder->CreateBinOp(Instruction::Mul, AndVal, ConstantInt::get(I64Ty, 0llu - (1llu << (bw - 1))), RegName);
+    Builder->CreateBinOp(Instruction::Mul, AndVal, ConstantInt::get(I64Ty, mask), RegName);
   auto *ResVal =
     Builder->CreateOr(NegVal, Op, RegName);
   saveInst(ResVal, &SI);
@@ -831,6 +849,8 @@ void DepromoteRegisters::visitIntToPtrInst(IntToPtrInst &II) {
 // ---- Call ----
 void DepromoteRegisters::visitCallInst(CallInst &CI) {
   auto *CalledF = CI.getCalledFunction();
+  if (CalledF->isIntrinsic() && CalledF->getInstructionCount() == 0 && CalledF->getReturnType()->isVoidTy())
+    return; // ignore LLVM instrinsic void functions
   assert(FuncMap.count(CalledF));
   auto *CalledFInTgt = FuncMap[CalledF];
   
