@@ -112,14 +112,23 @@ PreservedAnalyses FunctionOutlinePass::run(Module &M, ModuleAnalysisManager &MAM
                     pointToInsert = &I;
                     break;
                 }
-                BasicBlock *succ = BB->splitBasicBlock(pointToInsert);
+                BasicBlock *succ;
+                succ = BB->splitBasicBlock(pointToInsert);
+                    
                 countArgs = countOutlinedArgs(succ, funcArgs);
+                
                 bool canSplit = false;
                 /* Find split the block to another block, so that 
                 the outlined func does not exceed 10 func args */
                 if (countArgs>=15){
                     while(instsInBlock-splitPoint>3){
                         pointToInsert = pointToInsert->getNextNode();
+
+                        if (isa<PHINode>(pointToInsert) || pointToInsert->isEHPad()){
+                            splitPoint++;
+                            continue;
+                        }
+                        
                         MergeBlockIntoPredecessor(succ);
                         succ = BB->splitBasicBlock(pointToInsert);
                         countArgs = countOutlinedArgs(succ, funcArgs);
