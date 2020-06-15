@@ -193,7 +193,12 @@ Value *DepromoteRegisters::translateSrcOperandToTgt(Value *V, unsigned OperandId
     return V;
 
   } else if (isa<UndefValue>(V)) {
-    return UndefValue::get(I64Ty);
+    if (V->getType()->isIntegerTy())
+      return ConstantInt::get(I64Ty, 0);
+    else if (V->getType()->isPointerTy())
+      return ConstantPointerNull::get(dyn_cast<PointerType>(V->getType()));
+    else
+      return UndefValue::get(I64Ty);
 
   } else if (auto *GV = dyn_cast<GlobalVariable>(V)) {
     assert(GVMap.count(GV));
